@@ -3,6 +3,7 @@ from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, Batch
 from keras.layers.advanced_activations import LeakyReLU
 import tensorflow as tf
 import numpy as np
+import h5py
 import os
 import cv2
 from keras.applications.mobilenet import MobileNet
@@ -279,6 +280,110 @@ class YOLO(object):
         boxes  = self.decode_netout(netout)
         
         return boxes
+
+    def predict_batches(self, predict_imgs, batch_size):
+        """
+        Predict BBs on images working in batches.
+        """
+
+        self.batch_size = batch_size
+
+        ############################################
+        # Make predict generators
+        ############################################
+
+        generator_config = {
+            'IMAGE_H'         : self.input_size, 
+            'IMAGE_W'         : self.input_size,
+            'GRID_H'          : self.grid_h,  
+            'GRID_W'          : self.grid_w,
+            'BOX'             : self.nb_box,
+            'LABELS'          : self.labels,
+            'CLASS'           : len(self.labels),
+            'ANCHORS'         : self.anchors,
+            'BATCH_SIZE'      : self.batch_size,
+            'TRUE_BOX_BUFFER' : self.max_box_per_image,
+        }    
+
+        predict_batch = BatchGenerator(predict_imgs,
+                                     generator_config,
+                                     norm=self.feature_extractor.normalize,
+                                     jitter=False,      # We don't augment the images during testing
+                                     shuffle=False)
+
+        netout = self.model.predict_generator(generator         = predict_batch,
+                                             max_queue_size     = 8,
+                                             workers            = 4,
+                                             verbose            = 2)
+
+        print("Images evaluated: ", len(netout))
+
+        boxes = []
+        for out in netout:
+            boxes.append(self.decode_netout(out))
+
+        return boxes
+
+
+    def predict_bottlenecks(self, predict_imgs, batch_size, netout, b_batch, y_batch):
+        """
+        Feed images to the network and save to file the output of the feature extractor (netout),
+        the GT boxes processed to be fed into the network as input (b_batch) and the desired network output (y_batch).
+        The model needs to be created with create_final_layers = False in the constructor.
+
+        netout, b_batch, y_batch: h5 files opened before calling this method.
+        """
+        # TODO:
+        # - create bottleneck generation with batches
+        # - save the three components (netout, b_batch, y_batch) on a single h5 file
+
+        #TODO We support only one element per batch
+        self.batch_size = 1
+
+        ############################################
+        # Make predict generators
+        ############################################
+
+        generator_config = {
+            'IMAGE_H'         : self.input_size, 
+            'IMAGE_W'         : self.input_size,
+            'GRID_H'          : self.grid_h,  
+            'GRID_W'          : self.grid_w,
+            'BOX'             : self.nb_box,
+            'LABELS'          : self.labels,
+            'CLASS'           : len(self.labels),
+            'ANCHORS'         : self.anchors,
+            'BATCH_SIZE'      : self.batch_size,
+            'TRUE_BOX_BUFFER' : self.max_box_per_image,
+        }    
+
+        # TODO probably we can enable shuffle and jitter but double check
+        predict_batch = BatchGenerator(predict_imgs, 
+                                     generator_config, 
+                                     norm=self.feature_extractor.normalize,
+                                     jitter=False,      # IMPORTANT!!!
+                                     shuffle=False)     # IMPORTANT!!!
+
+        print("Batches len", len(predict_batch))
+
+        # we cycly through the batches and save b_batch and y_batch
+        for i in range(0, len(predict_batch)):
+            # the output of the generator is [x_batch, b_batch], y_batch
+            # [<input images>, <GT boxes>], desired network output
+            el_1, el_2 = predict_batch.__getitem__(i)
+
+            # append elements without batch dimension
+            b_batch[i] = np.squeeze(el_1[1], axis=0)
+            y_batch[i] = np.squeeze(el_2, axis=0)
+
+            # generate bottleneck
+            pred = self.model.predict(x = el_1, batch_size = self.batch_size, verbose = 1)
+            netout[i] = np.squeeze(pred, axis=0)
+
+            if i%500==0:
+                print(i, "images elaborated") 
+        
+        return
 
     def bbox_iou(self, box1, box2):
         x1_min  = box1.x - box1.w/2
