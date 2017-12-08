@@ -9,16 +9,32 @@ from keras.applications.mobilenet import MobileNet
 from keras.layers.merge import concatenate
 from keras.optimizers import SGD, Adam, RMSprop
 from preprocessing import BatchGenerator
-from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint, TensorBoard
 from utils import BoundBox
 from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature
+
+class NBatchLogger(Callback):
+    """
+    Simple callback to show the loss only after a certain number of batches
+    """
+    def __init__(self, display=100):
+        '''
+        display: Number of batches to wait before outputting loss
+        '''
+        self.display = display
+
+    def on_batch_end(self, batch, logs={}):
+        if batch % self.display == 0:
+            print("\n{0}/{1} - Batch Loss: {2}".format(batch,self.params["steps"],
+                                                logs["loss"]))
 
 class YOLO(object):
     def __init__(self, architecture,
                        input_size, 
                        labels, 
                        max_box_per_image,
-                       anchors):
+                       anchors,
+                       create_final_layers=True):
 
         self.input_size = input_size
         
@@ -55,29 +71,34 @@ class YOLO(object):
         else:
             raise Exception('Architecture not supported! Only support Full Yolo, Tiny Yolo, MobileNet, SqueezeNet, VGG16, ResNet50, and Inception3 at the moment!')
 
-        print self.feature_extractor.get_output_shape()    
-        self.grid_h, self.grid_w = self.feature_extractor.get_output_shape()        
+        print(self.feature_extractor.get_output_shape())    
+        self.grid_h, self.grid_w = self.feature_extractor.get_output_shape()
+
         features = self.feature_extractor.extract(input_image)            
 
-        # make the object detection layer
-        output = Conv2D(self.nb_box * (4 + 1 + self.nb_class), 
-                        (1,1), strides=(1,1), 
-                        padding='same', 
-                        name='conv_23', 
-                        kernel_initializer='lecun_normal')(features)
-        output = Reshape((self.grid_h, self.grid_w, self.nb_box, 4 + 1 + self.nb_class))(output)
-        output = Lambda(lambda args: args[0])([output, self.true_boxes])
+        if create_final_layers:
+            # make the object detection layer
+            output = Conv2D(self.nb_box * (4 + 1 + self.nb_class), 
+                            (1,1), strides=(1,1), 
+                            padding='same', 
+                            name='conv_23', 
+                            kernel_initializer='lecun_normal')(features)
+            output = Reshape((self.grid_h, self.grid_w, self.nb_box, 4 + 1 + self.nb_class))(output)
+            output = Lambda(lambda args: args[0])([output, self.true_boxes])
 
-        self.model = Model([input_image, self.true_boxes], output)
-        
-        # initialize the weights of the detection layer
-        layer = self.model.layers[-4]
-        weights = layer.get_weights()
+            self.model = Model([input_image, self.true_boxes], output)
 
-        new_kernel = np.random.normal(size=weights[0].shape)/(self.grid_h*self.grid_w)
-        new_bias   = np.random.normal(size=weights[1].shape)/(self.grid_h*self.grid_w)
+            # initialize the weights of the detection layer
+            layer = self.model.layers[-4]
+            weights = layer.get_weights()
 
-        layer.set_weights([new_kernel, new_bias])
+            new_kernel = np.random.normal(size=weights[0].shape)/(self.grid_h*self.grid_w)
+            new_bias   = np.random.normal(size=weights[1].shape)/(self.grid_h*self.grid_w)
+
+            layer.set_weights([new_kernel, new_bias])
+        else:
+            # make a model with only the architecture's body
+            self.model = Model([input_image, self.true_boxes], features)    # I pass also the boxes even if useless TODO check this comment
 
         # print a summary of the whole model
         self.model.summary()
@@ -238,6 +259,14 @@ class YOLO(object):
     def load_weights(self, weight_path):
         self.model.load_weights(weight_path)
 
+    def load_head_weights(self, weight_path):
+        """
+        Load only the weights for the last layer of the network.
+        The load happens by layer name so the weights need to have that.
+        """
+        self.model.load_weights(weight_path, by_name=True)
+
+
     def predict(self, image):
         image = cv2.resize(image, (self.input_size, self.input_size))
         image = self.feature_extractor.normalize(image)
@@ -320,13 +349,13 @@ class YOLO(object):
         for c in range(self.nb_class):
             sorted_indices = list(reversed(np.argsort([box.classes[c] for box in boxes])))
 
-            for i in xrange(len(sorted_indices)):
+            for i in range(len(sorted_indices)):
                 index_i = sorted_indices[i]
                 
                 if boxes[index_i].classes[c] == 0: 
                     continue
                 else:
-                    for j in xrange(i+1, len(sorted_indices)):
+                    for j in range(i+1, len(sorted_indices)):
                         index_j = sorted_indices[j]
                         
                         if self.bbox_iou(boxes[index_i], boxes[index_j]) >= nms_threshold:
@@ -363,7 +392,8 @@ class YOLO(object):
                     coord_scale,
                     class_scale,
                     saved_weights_name='best_weights.h5',
-                    debug=False):     
+                    debug=False,
+                    freeze_body=True):
 
         self.batch_size = batch_size
         self.warmup_bs  = warmup_epochs * (train_times*(len(train_imgs)/batch_size+1) + valid_times*(len(valid_imgs)/batch_size+1))
@@ -383,6 +413,11 @@ class YOLO(object):
 
         optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         self.model.compile(loss=self.custom_loss, optimizer=optimizer)
+
+        if freeze_body:
+            # Freeze the feature extractor part of the network
+            self.model.layers[1].trainable = False
+            self.model.summary()
 
         ############################################
         # Make train and validation generators
@@ -408,10 +443,12 @@ class YOLO(object):
                                      generator_config, 
                                      norm=self.feature_extractor.normalize,
                                      jitter=False)
-
+        print("train_batch len", len(train_batch))
+        print("valid_batch len", len(valid_batch))
         ############################################
         # Make a few callbacks
         ############################################
+        batch_logger = NBatchLogger(display=500)
 
         early_stop = EarlyStopping(monitor='val_loss', 
                            min_delta=0.001, 
@@ -424,10 +461,11 @@ class YOLO(object):
                                      save_best_only=True, 
                                      mode='min', 
                                      period=1)
+        # TODO change the path for tensorboard logs
         tb_counter  = len([log for log in os.listdir(os.path.expanduser('~/logs/')) if 'yolo' in log]) + 1
         tensorboard = TensorBoard(log_dir=os.path.expanduser('~/logs/') + 'yolo' + '_' + str(tb_counter), 
                                   histogram_freq=0, 
-                                  #write_batch_performance=True,
+                                 # write_batch_performance=True,
                                   write_graph=True, 
                                   write_images=False)
 
@@ -438,9 +476,10 @@ class YOLO(object):
         self.model.fit_generator(generator        = train_batch, 
                                  steps_per_epoch  = len(train_batch) * train_times, 
                                  epochs           = nb_epoch, 
-                                 verbose          = 1,
+                                 verbose          = 2,
                                  validation_data  = valid_batch,
                                  validation_steps = len(valid_batch) * valid_times,
-                                 callbacks        = [early_stop, checkpoint, tensorboard], 
-                                 workers          = 3,
+                                 callbacks        = [batch_logger, early_stop, checkpoint, tensorboard], 
+                                 workers 	      = 4,
                                  max_queue_size   = 8)
+
