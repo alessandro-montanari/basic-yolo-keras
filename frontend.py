@@ -309,7 +309,7 @@ class YOLO(object):
                                      generator_config,
                                      norm=self.feature_extractor.normalize,
                                      jitter=False,      # We don't augment the images during testing
-                                     shuffle=False)
+                                     shuffle=False)     # We don't suffle because we need to keep the correspondence between BBs and images
 
         netout = self.model.predict_generator(generator         = predict_batch,
                                              max_queue_size     = 8,
