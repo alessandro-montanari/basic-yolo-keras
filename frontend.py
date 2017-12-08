@@ -325,7 +325,7 @@ class YOLO(object):
         return boxes
 
 
-    def predict_bottlenecks(self, predict_imgs, batch_size, netout, b_batch, y_batch):
+    def create_bottlenecks(self, predict_imgs, batch_size, netout, b_batch, y_batch):
         """
         Feed images to the network and save to file the output of the feature extractor (netout),
         the GT boxes processed to be fed into the network as input (b_batch) and the desired network output (y_batch).
