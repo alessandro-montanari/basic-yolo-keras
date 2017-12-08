@@ -99,6 +99,26 @@ def draw_boxes(image, boxes, labels):
                     (0,255,0), 2)
         
     return image        
+
+def draw_gt_boxes(image, boxes, labels):
+
+    for box in boxes:
+        xmin  = box.x
+        xmax  = box.x + box.w
+        ymin  = box.y
+        ymax  = box.y + box.h
+
+        image = image.copy()
+        cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 1)
+        cv2.putText(image,
+                    labels[box.get_label()],
+                    (xmin, ymin - 13),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1e-3 * image.shape[0],
+                    (0,255,0), 2)
+
+    return image
+
         
 def decode_netout(netout, obj_threshold, nms_threshold, anchors, nb_class):
     grid_h, grid_w, nb_box = netout.shape[:3]
@@ -163,3 +183,4 @@ def softmax(x, axis=-1, t=-100.):
     e_x = np.exp(x)
     
     return e_x / e_x.sum(axis, keepdims=True)
+
