@@ -82,9 +82,12 @@ def _main_(args):
 
     # parse annotations of the validation set, if any, otherwise split the training set
     if os.path.exists(config['valid']['valid_annot_folder']):
-        valid_imgs, valid_labels = parse_annotation(config['valid']['valid_annot_folder'], 
-                                                    config['valid']['valid_image_folder'], 
-                                                    config['model']['labels'])
+        print("Loading validation set")
+        # valid_imgs, valid_labels = parse_annotation(config['valid']['valid_annot_folder'], 
+        #                                             config['valid']['valid_image_folder'], 
+        #                                             config['model']['labels'])
+        with open(config['valid']['valid_annot_folder'], 'r') as f:
+            valid_imgs = json.load(f)
     else:
         train_valid_split = int(0.9*len(train_imgs))
         np.random.shuffle(train_imgs)
@@ -92,7 +95,6 @@ def _main_(args):
         valid_imgs = train_imgs[train_valid_split:]
         train_imgs = train_imgs[:train_valid_split]
 
-    
     #overlap_labels = set(config['model']['labels']).intersection(set(train_labels.keys()))
 
     #print('Seen labels:\t', train_labels)
@@ -138,7 +140,9 @@ def _main_(args):
                coord_scale        = config['train']['coord_scale'],
                class_scale        = config['train']['class_scale'],
                saved_weights_name = config['train']['saved_weights_name'],
-               debug              = config['train']['debug'])
+               tensorboard_dir    = config['train']['tb_dir'], 
+               debug              = config['train']['debug'],
+               body_layers_to_train = config['train']['body_layers_to_train'])
 
 if __name__ == '__main__':
     args = argparser.parse_args()

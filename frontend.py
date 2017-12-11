@@ -312,9 +312,10 @@ class YOLO(object):
                                      shuffle=False)     # We don't suffle because we need to keep the correspondence between BBs and images
 
         netout = self.model.predict_generator(generator         = predict_batch,
+                                             steps              = len(predict_batch),
                                              max_queue_size     = 8,
                                              workers            = 4,
-                                             verbose            = 2)
+                                             verbose            = 1)
 
         print("Images evaluated: ", len(netout))
 
@@ -377,7 +378,7 @@ class YOLO(object):
             y_batch[i] = np.squeeze(el_2, axis=0)
 
             # generate bottleneck
-            pred = self.model.predict(x = el_1, batch_size = self.batch_size, verbose = 1)
+            pred = self.model.predict(x = el_1, batch_size = self.batch_size)
             netout[i] = np.squeeze(pred, axis=0)
 
             if i%500==0:
@@ -496,9 +497,10 @@ class YOLO(object):
                     no_object_scale,
                     coord_scale,
                     class_scale,
+                    body_layers_to_train,
+                    tensorboard_dir,
                     saved_weights_name='best_weights.h5',
-                    debug=False,
-                    freeze_body=True):
+                    debug=False):
 
         self.batch_size = batch_size
         self.warmup_bs  = warmup_epochs * (train_times*(len(train_imgs)/batch_size+1) + valid_times*(len(valid_imgs)/batch_size+1))
@@ -519,10 +521,20 @@ class YOLO(object):
         optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         self.model.compile(loss=self.custom_loss, optimizer=optimizer)
 
-        if freeze_body:
+        if body_layers_to_train:
+            # train only the listed layers in the body
+            for layer in self.model.layers[1].layers:
+                if layer.name in body_layers_to_train:
+                    layer.trainable = True
+
+                    print("Train", layer.name, "in body.")
+                else:
+                    layer.trainable = False
+        else:
             # Freeze the feature extractor part of the network
             self.model.layers[1].trainable = False
-            self.model.summary()
+
+        self.model.summary()
 
         ############################################
         # Make train and validation generators
@@ -567,8 +579,8 @@ class YOLO(object):
                                      mode='min', 
                                      period=1)
         # TODO change the path for tensorboard logs
-        tb_counter  = len([log for log in os.listdir(os.path.expanduser('~/logs/')) if 'yolo' in log]) + 1
-        tensorboard = TensorBoard(log_dir=os.path.expanduser('~/logs/') + 'yolo' + '_' + str(tb_counter), 
+        tb_counter  = len([log for log in os.listdir(tensorboard_dir) if 'yolo' in log]) + 1
+        tensorboard = TensorBoard(log_dir=os.path.join(tensorboard_dir, 'yolo' + '_' + str(tb_counter)), 
                                   histogram_freq=0, 
                                  # write_batch_performance=True,
                                   write_graph=True, 
@@ -584,7 +596,7 @@ class YOLO(object):
                                  verbose          = 2,
                                  validation_data  = valid_batch,
                                  validation_steps = len(valid_batch) * valid_times,
-                                 callbacks        = [batch_logger, early_stop, checkpoint, tensorboard], 
+                                 callbacks        = [batch_logger, checkpoint, tensorboard], 
                                  workers 	      = 4,
                                  max_queue_size   = 8)
 
