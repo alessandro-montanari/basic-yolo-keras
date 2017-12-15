@@ -90,7 +90,7 @@ def draw_boxes(image, boxes, labels):
         ymin  = int((box.y - box.h/2) * image.shape[0])
         ymax  = int((box.y + box.h/2) * image.shape[0])
 
-        cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 3)
+        cv2.rectangle(image, (xmin,ymin), (xmax,ymax), (0,255,0), 1)
         cv2.putText(image, 
                     labels[box.get_label()] + ' ' + str(box.get_score()), 
                     (xmin, ymin - 13), 
