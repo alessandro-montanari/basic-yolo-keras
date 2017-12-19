@@ -82,56 +82,43 @@ class BatchGenerator(Sequence):
         # All augmenters with per_channel=0.5 will sample one value _per image_
         # in 50% of all cases. In all other cases they will sample new values
         # _per channel_.
-        self.aug_pipe = iaa.Sequential(
-            [
-                # apply the following augmenters to most images
-                #iaa.Fliplr(0.5), # horizontally flip 50% of all images
-                #iaa.Flipud(0.2), # vertically flip 20% of all images
-                #sometimes(iaa.Crop(percent=(0, 0.1))), # crop images by 0-10% of their height/width
-                sometimes(iaa.Affine(
-                    #scale={"x": (0.8, 1.2), "y": (0.8, 1.2)}, # scale images to 80-120% of their size, individually per axis
-                    #translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, # translate by -20 to +20 percent (per axis)
-                    #rotate=(-5, 5), # rotate by -45 to +45 degrees
-                    #shear=(-5, 5), # shear by -16 to +16 degrees
-                    #order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
-                    #cval=(0, 255), # if mode is constant, use a cval between 0 and 255
-                    #mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
-                )),
-                # execute 0 to 5 of the following (less important) augmenters per image
-                # don't execute all of them, as that would often be way too strong
-                iaa.SomeOf((0, 5),
-                    [
-                        #sometimes(iaa.Superpixels(p_replace=(0, 1.0), n_segments=(20, 200))), # convert images into their superpixel representation
-                        iaa.OneOf([
-                            iaa.GaussianBlur((0, 3.0)), # blur images with a sigma between 0 and 3.0
-                            iaa.AverageBlur(k=(2, 7)), # blur image using local means with kernel sizes between 2 and 7
-                            iaa.MedianBlur(k=(3, 11)), # blur image using local medians with kernel sizes between 2 and 7
-                        ]),
-                        iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.5)), # sharpen images
-                        #iaa.Emboss(alpha=(0, 1.0), strength=(0, 2.0)), # emboss images
-                        # search either for all edges or for directed edges
-                        #sometimes(iaa.OneOf([
-                        #    iaa.EdgeDetect(alpha=(0, 0.7)),
-                        #    iaa.DirectedEdgeDetect(alpha=(0, 0.7), direction=(0.0, 1.0)),
-                        #])),
-                        iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5), # add gaussian noise to images
-                        iaa.OneOf([
-                            iaa.Dropout((0.01, 0.1), per_channel=0.5), # randomly remove up to 10% of the pixels
-                            #iaa.CoarseDropout((0.03, 0.15), size_percent=(0.02, 0.05), per_channel=0.2),
-                        ]),
-                        #iaa.Invert(0.05, per_channel=True), # invert color channels
-                        iaa.Add((-10, 10), per_channel=0.5), # change brightness of images (by -10 to 10 of original value)
-                        iaa.Multiply((0.5, 1.5), per_channel=0.5), # change brightness of images (50-150% of original value)
-                        iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5), # improve or worsen the contrast
-                        #iaa.Grayscale(alpha=(0.0, 1.0)),
-                        #sometimes(iaa.ElasticTransformation(alpha=(0.5, 3.5), sigma=0.25)), # move pixels locally around (with random strengths)
-                        #sometimes(iaa.PiecewiseAffine(scale=(0.01, 0.05))) # sometimes move parts of the image around
-                    ],
-                    random_order=True
-                )
-            ],
-            random_order=True
-        )
+
+        self.aug_pipe = iaa.Sequential([
+            sometimes((
+                    # apply the following augmenters to most images
+                    iaa.Fliplr(0.5), # horizontally flip 50% of all images
+                    sometimes(iaa.OneOf([ 
+                                iaa.Affine(scale={"x": (0.8, 1.2), "y": (0.8, 1.2)}),
+                                iaa.Affine(shear=(-20, 20)),
+                                iaa.Affine(rotate=(-25, 25)),
+                                iaa.Affine(translate_percent={"x": (-0.3, 0.3), "y": (-0.3, 0.3)}),
+                        ])),
+                    # execute 1 to 5 of the following (less important) augmenters per image
+                    # don't execute all of them, as that would often be way too strong
+                    iaa.SomeOf((1, 3),
+                        [
+                            iaa.OneOf([
+                                iaa.GaussianBlur((0.25, 2)), # blur images with a sigma between 0 and 3.0
+                                iaa.AverageBlur(k=(2, 5)), # blur image using local means with kernel sizes between 2 and 7
+                                iaa.MedianBlur(k=(1, 3)) # blur image using local medians with kernel sizes between 2 and 7
+                            ]),
+                            iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.5)), # sharpen images
+                            iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.03*255), per_channel=0.5), # add gaussian noise to images
+                            iaa.OneOf([
+                                iaa.Dropout((0.01, 0.1), per_channel=0.5), # randomly remove up to 10% of the pixels
+                                iaa.CoarseDropout((0.03, 0.10), size_percent=(0.30, 0.40)),
+                            ]),
+                            #iaa.Invert(0.05, per_channel=True), # invert color channels
+                            iaa.Add((-25, 25), per_channel=0.1), # change brightness of images (by -10 to 10 of original value)
+                            iaa.Multiply((0.5, 1.5), per_channel=0.1), # change brightness of images (50-150% of original value)
+                            iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5), # improve or worsen the contrast
+                            iaa.PerspectiveTransform(scale=(0.025, 0.1))
+                        ],
+                        random_order=True
+                    )
+                ))],
+                random_order=True
+            )
 
         if shuffle: np.random.shuffle(self.images)
 
@@ -210,16 +197,16 @@ class BatchGenerator(Sequence):
                 x_batch[instance_count] = self.norm(img)
             else:
                 # plot image and bounding boxes for sanity check
+                #img2 = img.copy()
                 for obj in all_objs:
                     if obj['xmax'] > obj['xmin'] and obj['ymax'] > obj['ymin']:
                         cv2.rectangle(img[:,:,::-1], (obj['xmin'],obj['ymin']), (obj['xmax'],obj['ymax']), (255,0,0), 1)
-                        cv2.putText(img[:,:,::-1], obj['name'], 
-                                    (obj['xmin']+2, obj['ymin']+12), 
-                                    0, 1.2e-3 * img.shape[0], 
-                                    (0,255,0), 2)
-
+                        #cv2.putText(img2, obj['name'], 
+                        #            (obj['xmin']+2, obj['ymin']+12), 
+                        #            0, 1.2e-3 * img2.shape[0], 
+                        #            (0,255,0), 2)
                 #TODO We save the image here just to make it simple
-                #cv2.imwrite("/media/HD01/resizecheck" + str(idx) + ".bmp", img)
+                cv2.imwrite("/media/HD01/resizecheck" + str(idx) + ".bmp", img[:,:,::-1])
 
                 x_batch[instance_count] = img
 
@@ -235,53 +222,88 @@ class BatchGenerator(Sequence):
         if self.shuffle: np.random.shuffle(self.images)
         self.counter = 0
 
+
     def aug_image(self, train_instance, jitter):
-        image_name = train_instance['filename']
-        image = cv2.imread(image_name)
-        h, w, c = image.shape
+        image_name      = train_instance['filename']
+        image           = cv2.imread(image_name)
+        h, w, c         = image.shape
+        all_objs        = copy.deepcopy(train_instance['object'])        
+
+        bb_list     = []
+        new_boxes   = []
+
+        for obj in all_objs:      
+            bb_list.append(ia.BoundingBox(x1=obj['xmin'], y1=obj['ymin'], x2=obj['xmax'], y2=obj['ymax']))
         
-        all_objs = copy.deepcopy(train_instance['object'])
+        bbs = ia.BoundingBoxesOnImage(bb_list , shape=image.shape)
 
         if jitter:
-            ### scale the image
-            scale = np.random.uniform() / 10. + 1.
-            image = cv2.resize(image, (0,0), fx = scale, fy = scale)
+            while new_boxes==[]:
+                seq_det = self.aug_pipe.to_deterministic()
 
-            ### translate the image
-            max_offx = (scale-1.) * w
-            max_offy = (scale-1.) * h
-            offx = int(np.random.uniform() * max_offx)
-            offy = int(np.random.uniform() * max_offy)
-            
-            image = image[offy : (offy + h), offx : (offx + w)]
+                # augment image and adjust bbs
+                image_aug   = seq_det.augment_image(image)   
+                bbs_aug     = seq_det.augment_bounding_boxes([bbs])[0]
+                bbs_aug     = bbs_aug.remove_out_of_image().cut_out_of_image()  ## removes bbs outside of pic
 
-            ### flip the image
-            flip = np.random.binomial(1, .5)
-            if flip > 0.5: image = cv2.flip(image, 1)
-                
-            image = self.aug_pipe.augment_image(image)            
-            
-        # resize the image to standard size
-        image = cv2.resize(image, (self.config['IMAGE_H'], self.config['IMAGE_W']))
-        image = image[:,:,::-1]
+                # resize the image and bbs to standard size
+                if(self.config['IMAGE_W']!= w and self.config['IMAGE_H']!= h):
+                    image_aug = ia.imresize_single_image(image_aug, (self.config['IMAGE_W'], self.config['IMAGE_H']))
+                    bbs_aug = bbs_aug.on(image_aug)
 
-        # fix object's position and size
-        for obj in all_objs:
-            for attr in ['xmin', 'xmax']:
-                if jitter: obj[attr] = int(obj[attr] * scale - offx)
-                    
-                obj[attr] = int(obj[attr] * float(self.config['IMAGE_W']) / w)
-                obj[attr] = max(min(obj[attr], self.config['IMAGE_W']), 0)
-                
-            for attr in ['ymin', 'ymax']:
-                if jitter: obj[attr] = int(obj[attr] * scale - offy)
-                    
-                obj[attr] = int(obj[attr] * float(self.config['IMAGE_H']) / h)
-                obj[attr] = max(min(obj[attr], self.config['IMAGE_H']), 0)
+                image_aug = image_aug[:,:,::-1]
 
-            if jitter and flip > 0.5:
-                xmin = obj['xmin']
-                obj['xmin'] = self.config['IMAGE_W'] - obj['xmax']
-                obj['xmax'] = self.config['IMAGE_W'] - xmin
-                
-        return image, all_objs
+                classname   = all_objs[0]["name"]
+                classindex  = all_objs[0]["class"]
+
+                for i, bb in enumerate(bbs_aug.bounding_boxes):
+                    bbwidth     = bb.x2 - bb.x1
+                    bbheight    = bb.y2 - bb.y1
+
+                    # filter bbs that are too small
+                    if bbwidth > 4 and bbheight > 4:
+                        new_boxes.append({
+                                        'class': classindex,
+                                        'name': classname,
+                                        'xmin': int(bb.x1),
+                                        'ymin': int(bb.y1),
+                                        'xmax': int(bb.x2),
+                                        'ymax': int(bb.y2),
+                                        'bbwidth': int(bbwidth),
+                                        'bbheight': int(bbheight)
+                            })
+
+                return image_aug, new_boxes
+
+        else:
+            # resize the image and bbs to standard size
+            if(self.config['IMAGE_W']!= w and self.config['IMAGE_H']!= h):
+                image = ia.imresize_single_image(image, (self.config['IMAGE_W'], self.config['IMAGE_H']))
+                bbs   = bbs.on(image)
+
+                classname   = all_objs[0]["name"]
+                classindex  = all_objs[0]["class"]
+
+                for i, bb in enumerate(bbs.bounding_boxes):
+                    bbwidth     = bb.x2 - bb.x1
+                    bbheight    = bb.y2 - bb.y1
+
+                    # filter bbs that are too small
+                    if bbwidth > 4 and bbheight > 4:
+                        new_boxes.append({
+                                        'class': classindex,
+                                        'name': classname,
+                                        'xmin': int(bb.x1),
+                                        'ymin': int(bb.y1),
+                                        'xmax': int(bb.x2),
+                                        'ymax': int(bb.y2),
+                                        'bbwidth': int(bbwidth),
+                                        'bbheight': int(bbheight)
+                            })
+
+            else:
+                new_boxes = all_objs
+
+            image = image[:,:,::-1]
+
+            return image, new_boxes
