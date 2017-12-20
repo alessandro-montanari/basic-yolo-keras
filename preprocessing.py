@@ -1,5 +1,8 @@
 import os
 import cv2
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import copy
 import numpy as np
 import imgaug as ia
@@ -64,6 +67,8 @@ class BatchGenerator(Sequence):
                        jitter=True, 
                        norm=None):
         self.generator = None
+
+        self.counter = 0 
 
         self.images = images
         self.config = config
@@ -203,11 +208,10 @@ class BatchGenerator(Sequence):
                         cv2.rectangle(img[:,:,::-1], (obj['xmin'],obj['ymin']), (obj['xmax'],obj['ymax']), (255,0,0), 1)
                         #cv2.putText(img2, obj['name'], 
                         #            (obj['xmin']+2, obj['ymin']+12), 
-                        #            0, 1.2e-3 * img2.shape[0], 
+                        #            0, 1.2e-3 * img.shape[0], 
                         #            (0,255,0), 2)
-                #TODO We save the image here just to make it simple
-                cv2.imwrite("/media/HD01/resizecheck" + str(idx) + ".bmp", img[:,:,::-1])
-
+                cv2.imwrite("/home/am2266/rds/hpc-work/resizecheck/" + str(self.counter) + ".bmp", img)
+                self.counter += 1        
                 x_batch[instance_count] = img
 
             # increase instance counter in current batch
@@ -225,7 +229,8 @@ class BatchGenerator(Sequence):
 
     def aug_image(self, train_instance, jitter):
         image_name      = train_instance['filename']
-        image           = cv2.imread(image_name)
+        image           = plt.imread(image_name)
+        image = image[..., ::-1]
         h, w, c         = image.shape
         all_objs        = copy.deepcopy(train_instance['object'])        
 
