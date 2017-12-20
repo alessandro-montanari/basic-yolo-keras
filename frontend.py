@@ -6,6 +6,8 @@ import numpy as np
 import h5py
 import os
 import cv2
+import keras.backend as K
+from keras.models import load_model
 from keras.applications.mobilenet import MobileNet
 from keras.layers.merge import concatenate
 from keras.optimizers import SGD, Adam, RMSprop
@@ -13,6 +15,16 @@ from preprocessing import BatchGenerator
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint, TensorBoard
 from utils import BoundBox
 from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature
+
+class WeightsSaver(Callback):
+    def __init__(self, model, path):
+        self.model = model
+        self.path = path
+
+    def on_epoch_end(self, epoch, logs={}):
+        self.model.save_weights(os.path.join(self.path, "weights.{epoch:04d}-loss-{loss:.4f}-val_loss-{val_loss:.4f}.h5".format(epoch=epoch, loss=logs["loss"], val_loss=logs["val_loss"])))
+
+
 
 class NBatchLogger(Callback):
     """
@@ -257,8 +269,44 @@ class YOLO(object):
         
         return loss
 
+
     def load_weights(self, weight_path):
-        self.model.load_weights(weight_path)
+        # Get the names of the weights for the entire model
+        layer = self.model
+        symbolic_weights = []
+        for l in layer.layers:
+            if len(l.weights) > 0:
+                for el in l.weights:
+                    symbolic_weights.append(el)
+        names = [ el.name for el in symbolic_weights]
+        #print(names)
+
+        print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
+        print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+       
+        # Get the weights from the file in the same order set_weights wants them
+        f = h5py.File(weight_path, "r")
+        weights = []
+        for name in names:
+            if name.startswith("conv_23"):
+                weights.append(f["conv_23/" + name].value)
+            else:
+                weights.append(f["model_1/" + name].value) 
+
+        # Just a quick check to make sure that the weights are in the same order as set_weights wants them
+#        original_weights = layer.get_weights()
+#        for i, el in enumerate(original_weights):
+#            print(el.shape, weights[i].shape)
+
+        layer.set_weights(weights)
+
+        print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
+        print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+
 
     def load_head_weights(self, weight_path):
         """
@@ -313,8 +361,7 @@ class YOLO(object):
 
         netout = self.model.predict_generator(generator         = predict_batch,
                                              steps              = len(predict_batch),
-                                             max_queue_size     = 8,
-                                             workers            = 4,
+                                             workers            = 1, # set to 1 because I am not sure our generator is thread safe
                                              verbose            = 1)
 
         print("Images evaluated: ", len(netout))
@@ -518,9 +565,6 @@ class YOLO(object):
         # Compile the model
         ############################################
 
-        optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-        self.model.compile(loss=self.custom_loss, optimizer=optimizer)
-
         if body_layers_to_train:
             # train only the listed layers in the body
             for layer in self.model.layers[1].layers:
@@ -533,6 +577,9 @@ class YOLO(object):
         else:
             # Freeze the feature extractor part of the network
             self.model.layers[1].trainable = False
+
+        optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        self.model.compile(loss=self.custom_loss, optimizer=optimizer)
 
         self.model.summary()
 
@@ -557,7 +604,6 @@ class YOLO(object):
                                      generator_config, 
                                      jitter=True,
                                      norm=self.feature_extractor.normalize)
-
         valid_batch = BatchGenerator(valid_imgs, 
                                      generator_config, 
                                      norm=self.feature_extractor.normalize,
@@ -567,19 +613,23 @@ class YOLO(object):
         ############################################
         # Make a few callbacks
         ############################################
-        batch_logger = NBatchLogger(display=500)
+        batch_logger = NBatchLogger(display=200)
+
+        weights_saver = WeightsSaver(model = self.model, path = saved_weights_name)
 
         early_stop = EarlyStopping(monitor='val_loss', 
                            min_delta=0.001, 
                            patience=3, 
                            mode='min', 
                            verbose=1)
-        checkpoint = ModelCheckpoint(saved_weights_name, 
-                                     monitor='val_loss', 
-                                     verbose=1, 
-                                     save_best_only=True, 
-                                     mode='min', 
-                                     period=1)
+
+        checkpoint = ModelCheckpoint(os.path.join(saved_weights_name, "weights.{epoch:04d}-loss:{loss:.4f}-val_loss:{val_loss:.4f}.h5"),
+                                     monitor = 'val_loss',
+                                     verbose = 1,
+                                     save_best_only = False,
+                                     mode = 'auto',
+                                     save_weights_only = False,
+                                     period = 1)
         # TODO change the path for tensorboard logs
         tb_counter  = len([log for log in os.listdir(tensorboard_dir) if 'yolo' in log]) + 1
         tensorboard = TensorBoard(log_dir=os.path.join(tensorboard_dir, 'yolo' + '_' + str(tb_counter)), 
@@ -598,7 +648,7 @@ class YOLO(object):
                                  verbose          = 2,
                                  validation_data  = valid_batch,
                                  validation_steps = len(valid_batch) * valid_times,
-                                 callbacks        = [batch_logger, checkpoint, tensorboard], 
-                                 workers 	      = 4,
-                                 max_queue_size   = 8)
+                                 callbacks        = [batch_logger, weights_saver, tensorboard], 
+                                 workers 	  = 3,
+                                 max_queue_size   = 6)
 
