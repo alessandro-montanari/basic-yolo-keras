@@ -7,6 +7,7 @@ import h5py
 import os
 import cv2
 import keras.backend as K
+from keras.utils import multi_gpu_model
 from keras.models import load_model
 from keras.applications.mobilenet import MobileNet
 from keras.layers.merge import concatenate
