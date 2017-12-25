@@ -63,58 +63,69 @@ class YOLO(object):
         # Make the model
         ##########################
 
-        # make the feature extractor layers
-        input_image     = Input(shape=(self.input_size, self.input_size, 3))
-        self.true_boxes = Input(shape=(1, 1, 1, max_box_per_image , 4))  
+        # Instantiate the base model (or "template" model).
+        # We recommend doing this with under a CPU device scope,
+        # so that the model's weights are hosted on CPU memory.
+        # Otherwise they may end up hosted on a GPU, which would
+        # complicate weight sharing.
+        with tf.device('/cpu:0'):
 
-        if architecture == 'Inception3':
-            self.feature_extractor = Inception3Feature(self.input_size)  
-        elif architecture == 'SqueezeNet':
-            self.feature_extractor = SqueezeNetFeature(self.input_size)        
-        elif architecture == 'MobileNet':
-            self.feature_extractor = MobileNetFeature(self.input_size)
-        elif architecture == 'Full Yolo':
-            self.feature_extractor = FullYoloFeature(self.input_size)
-        elif architecture == 'Tiny Yolo':
-            self.feature_extractor = TinyYoloFeature(self.input_size)
-        elif architecture == 'VGG16':
-            self.feature_extractor = VGG16Feature(self.input_size)
-        elif architecture == 'ResNet50':
-            self.feature_extractor = ResNet50Feature(self.input_size)
-        else:
-            raise Exception('Architecture not supported! Only support Full Yolo, Tiny Yolo, MobileNet, SqueezeNet, VGG16, ResNet50, and Inception3 at the moment!')
+            # make the feature extractor layers
+            input_image     = Input(shape=(self.input_size, self.input_size, 3))
+            self.true_boxes = Input(shape=(1, 1, 1, max_box_per_image , 4))  
 
-        print(self.feature_extractor.get_output_shape())    
-        self.grid_h, self.grid_w = self.feature_extractor.get_output_shape()
+            if architecture == 'Inception3':
+                self.feature_extractor = Inception3Feature(self.input_size)  
+            elif architecture == 'SqueezeNet':
+                self.feature_extractor = SqueezeNetFeature(self.input_size)        
+            elif architecture == 'MobileNet':
+                self.feature_extractor = MobileNetFeature(self.input_size)
+            elif architecture == 'Full Yolo':
+                self.feature_extractor = FullYoloFeature(self.input_size)
+            elif architecture == 'Tiny Yolo':
+                self.feature_extractor = TinyYoloFeature(self.input_size)
+            elif architecture == 'VGG16':
+                self.feature_extractor = VGG16Feature(self.input_size)
+            elif architecture == 'ResNet50':
+                self.feature_extractor = ResNet50Feature(self.input_size)
+            else:
+                raise Exception('Architecture not supported! Only support Full Yolo, Tiny Yolo, MobileNet, SqueezeNet, VGG16, ResNet50, and Inception3 at the moment!')
 
-        features = self.feature_extractor.extract(input_image)            
+            print(self.feature_extractor.get_output_shape())    
+            self.grid_h, self.grid_w = self.feature_extractor.get_output_shape()
 
-        if create_final_layers:
-            # make the object detection layer
-            output = Conv2D(self.nb_box * (4 + 1 + self.nb_class), 
-                            (1,1), strides=(1,1), 
-                            padding='same', 
-                            name='conv_23', 
-                            kernel_initializer='lecun_normal')(features)
-            output = Reshape((self.grid_h, self.grid_w, self.nb_box, 4 + 1 + self.nb_class))(output)
-            output = Lambda(lambda args: args[0])([output, self.true_boxes])
+            features = self.feature_extractor.extract(input_image)            
 
-            self.model = Model([input_image, self.true_boxes], output)
+            if create_final_layers:
+                # make the object detection layer
+                output = Conv2D(self.nb_box * (4 + 1 + self.nb_class), 
+                                (1,1), strides=(1,1), 
+                                padding='same', 
+                                name='conv_23', 
+                                kernel_initializer='lecun_normal')(features)
+                output = Reshape((self.grid_h, self.grid_w, self.nb_box, 4 + 1 + self.nb_class))(output)
+                output = Lambda(lambda args: args[0])([output, self.true_boxes])
 
-            # initialize the weights of the detection layer
-            layer = self.model.layers[-4]
-            weights = layer.get_weights()
+                self.template_model = Model([input_image, self.true_boxes], output)
 
-            new_kernel = np.random.normal(size=weights[0].shape)/(self.grid_h*self.grid_w)
-            new_bias   = np.random.normal(size=weights[1].shape)/(self.grid_h*self.grid_w)
+                # initialize the weights of the detection layer
+                layer = self.template_model.layers[-4]
+                weights = layer.get_weights()
 
-            layer.set_weights([new_kernel, new_bias])
-        else:
-            # make a model with only the architecture's body
-            self.model = Model([input_image, self.true_boxes], features)    # I pass also the boxes even if useless TODO check this comment
+                new_kernel = np.random.normal(size=weights[0].shape)/(self.grid_h*self.grid_w)
+                new_bias   = np.random.normal(size=weights[1].shape)/(self.grid_h*self.grid_w)
 
-        # print a summary of the whole model
-        self.model.summary()
+                layer.set_weights([new_kernel, new_bias])
+            else:
+                # make a model with only the architecture's body
+                self.template_model = Model([input_image, self.true_boxes], features)    # I pass also the boxes even if useless TODO check this comment
+
+            # print a summary of the whole model
+            self.template_model.summary()
+        
+        # Replicates the model on N GPUs.
+        # This assumes that your machine has N available GPUs.
+        self.parallel_model = multi_gpu_model(self.template_model, gpus=2)
 
     def custom_loss(self, y_true, y_pred):
         mask_shape = tf.shape(y_true)[:4]
@@ -272,7 +283,7 @@ class YOLO(object):
 
     def load_weights(self, weight_path):
         # Get the names of the weights for the entire model
-        layer = self.model
+        layer = self.template_model
         symbolic_weights = []
         for l in layer.layers:
             if len(l.weights) > 0:
@@ -281,10 +292,10 @@ class YOLO(object):
         names = [ el.name for el in symbolic_weights]
         #print(names)
 
-        print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
-        print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        print("Sum conv_22", np.sum(self.template_model.get_layer("model_1").get_layer("conv_22").get_weights()))
+        print("Sum norm_22", np.sum(self.template_model.get_layer("model_1").get_layer("norm_22").get_weights()))
+        print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[0]))
+        print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[1]))
        
         # Get the weights from the file in the same order set_weights wants them
         f = h5py.File(weight_path, "r")
@@ -302,10 +313,10 @@ class YOLO(object):
 
         layer.set_weights(weights)
 
-        print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
-        print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        print("Sum conv_22", np.sum(self.template_model.get_layer("model_1").get_layer("conv_22").get_weights()))
+        print("Sum norm_22", np.sum(self.template_model.get_layer("model_1").get_layer("norm_22").get_weights()))
+        print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[0]))
+        print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[1]))
 
 
     def load_head_weights(self, weight_path):
@@ -313,7 +324,7 @@ class YOLO(object):
         Load only the weights for the last layer of the network.
         The load happens by layer name so the weights need to have that.
         """
-        self.model.load_weights(weight_path, by_name=True)
+        self.template_model.load_weights(weight_path, by_name=True)
 
 
     def predict(self, image):
@@ -567,7 +578,7 @@ class YOLO(object):
 
         if body_layers_to_train:
             # train only the listed layers in the body
-            for layer in self.model.layers[1].layers:
+            for layer in self.parallel_model.layers[1].layers:
                 if layer.name in body_layers_to_train:
                     layer.trainable = True
 
@@ -576,12 +587,12 @@ class YOLO(object):
                     layer.trainable = False
         else:
             # Freeze the feature extractor part of the network
-            self.model.layers[1].trainable = False
+            self.parallel_model.layers[1].trainable = False
 
         optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-        self.model.compile(loss=self.custom_loss, optimizer=optimizer)
+        self.parallel_model.compile(loss=self.custom_loss, optimizer=optimizer)
 
-        self.model.summary()
+        self.parallel_model.summary()
 
         ############################################
         # Make train and validation generators
@@ -615,7 +626,8 @@ class YOLO(object):
         ############################################
         batch_logger = NBatchLogger(display=200)
 
-        weights_saver = WeightsSaver(model = self.model, path = saved_weights_name)
+        # Save model via the template model (which shares the same weights):
+        weights_saver = WeightsSaver(model = self.template_model, path = saved_weights_name)
 
         early_stop = EarlyStopping(monitor='val_loss', 
                            min_delta=0.001, 
@@ -642,7 +654,7 @@ class YOLO(object):
         # Start the training process
         ############################################        
 
-        self.model.fit_generator(generator        = train_batch, 
+        self.parallel_model.fit_generator(generator        = train_batch, 
                                  steps_per_epoch  = len(train_batch) * train_times, 
                                  epochs           = nb_epoch, 
                                  verbose          = 2,
