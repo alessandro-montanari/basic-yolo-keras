@@ -205,7 +205,7 @@ class BatchGenerator(Sequence):
                 #img2 = img.copy()
                 for obj in all_objs:
                     if obj['xmax'] > obj['xmin'] and obj['ymax'] > obj['ymin']:
-                        cv2.rectangle(img[:,:,::-1], (obj['xmin'],obj['ymin']), (obj['xmax'],obj['ymax']), (255,0,0), 1)
+                        cv2.rectangle(img, (obj['xmin'],obj['ymin']), (obj['xmax'],obj['ymax']), (255,0,0), 1)
                         #cv2.putText(img2, obj['name'], 
                         #            (obj['xmin']+2, obj['ymin']+12), 
                         #            0, 1.2e-3 * img.shape[0], 
@@ -226,11 +226,16 @@ class BatchGenerator(Sequence):
         if self.shuffle: np.random.shuffle(self.images)
         self.counter = 0
 
-
+    # TODO this function needs to be checked, some comments:
+    # - If we have jitter enabled, the if that resizes the images doesn't have the else while in the non-jitter
+    # case yes
+    # - The code for removing small boxes is repeated and in one case is inside the if for the resize while
+    # in the other case is outside
+    # - Check why do we need to do this image[:,:,::-1] and this image_aug[:,:,::-1]
     def aug_image(self, train_instance, jitter):
         image_name      = train_instance['filename']
         image           = plt.imread(image_name)
-        image = image[..., ::-1]
+        image = image[..., ::-1] # from RGB (matplotlib) to BGR (opencv)
         h, w, c         = image.shape
         all_objs        = copy.deepcopy(train_instance['object'])        
 
@@ -252,11 +257,9 @@ class BatchGenerator(Sequence):
                 bbs_aug     = bbs_aug.remove_out_of_image().cut_out_of_image()  ## removes bbs outside of pic
 
                 # resize the image and bbs to standard size
-                if(self.config['IMAGE_W']!= w and self.config['IMAGE_H']!= h):
+                if(self.config['IMAGE_W'] != w and self.config['IMAGE_H'] != h):
                     image_aug = ia.imresize_single_image(image_aug, (self.config['IMAGE_W'], self.config['IMAGE_H']))
                     bbs_aug = bbs_aug.on(image_aug)
-
-                image_aug = image_aug[:,:,::-1]
 
                 classname   = all_objs[0]["name"]
                 classindex  = all_objs[0]["class"]
@@ -277,7 +280,8 @@ class BatchGenerator(Sequence):
                                         'bbwidth': int(bbwidth),
                                         'bbheight': int(bbheight)
                             })
-
+                
+                image_aug = np.moveaxis(image_aug, -1, 0) # Move channels to first position (CHW)
                 return image_aug, new_boxes
 
         else:
@@ -309,6 +313,6 @@ class BatchGenerator(Sequence):
             else:
                 new_boxes = all_objs
 
-            image = image[:,:,::-1]
+            image = np.moveaxis(image, -1, 0) # Move channels to first position (CHW)
 
             return image, new_boxes
