@@ -72,7 +72,7 @@ class YOLO(object):
         with tf.device('/cpu:0'):
 
             # make the feature extractor layers
-            input_image     = Input(shape=(self.input_size, self.input_size, 3))
+            input_image     = Input(shape=(3, self.input_size, self.input_size))
             self.true_boxes = Input(shape=(1, 1, 1, max_box_per_image , 4))  
 
             if architecture == 'Inception3':

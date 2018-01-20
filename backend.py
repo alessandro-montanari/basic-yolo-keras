@@ -28,7 +28,7 @@ class BaseFeatureExtractor(object):
         raise NotImplementedError("error message")       
 
     def get_output_shape(self):
-        return self.feature_extractor.get_output_shape_at(-1)[1:3]
+        return self.feature_extractor.get_output_shape_at(-1)[2:4]
 
     def extract(self, input_image):
         return self.feature_extractor(input_image)
@@ -36,11 +36,11 @@ class BaseFeatureExtractor(object):
 class FullYoloFeature(BaseFeatureExtractor):
     """docstring for ClassName"""
     def __init__(self, input_size):
-        input_image = Input(shape=(input_size, input_size, 3))
+        input_image = Input(shape=(3, input_size, input_size))
 
         # the function to implement the orgnization layer (thanks to github.com/allanzelener/YAD2K)
         def space_to_depth_x2(x):
-            return tf.space_to_depth(x, block_size=2)
+            return tf.space_to_depth(x, block_size=2, data_format='NCHW')
 
         # Layer 1
         x = Conv2D(32, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
@@ -156,7 +156,7 @@ class FullYoloFeature(BaseFeatureExtractor):
         skip_connection = LeakyReLU(alpha=0.1)(skip_connection)
         skip_connection = Lambda(space_to_depth_x2)(skip_connection)
 
-        x = concatenate([skip_connection, x])
+        x = concatenate([skip_connection, x], axis=1)
 
         # Layer 22
         x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_22', use_bias=False)(x)
@@ -164,7 +164,7 @@ class FullYoloFeature(BaseFeatureExtractor):
         x = LeakyReLU(alpha=0.1)(x)
 
         self.feature_extractor = Model(input_image, x)  
-        self.feature_extractor.load_weights(FULL_YOLO_BACKEND_PATH)
+        # self.feature_extractor.load_weights(FULL_YOLO_BACKEND_PATH)
 
         print("Feature extractor summary")
         self.feature_extractor.summary()
