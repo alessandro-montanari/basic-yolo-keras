@@ -40,8 +40,18 @@ class FullYoloFeature(BaseFeatureExtractor):
 
         # the function to implement the orgnization layer (thanks to github.com/allanzelener/YAD2K)
         def space_to_depth_x2(x):
-            return tf.space_to_depth(x, block_size=2, data_format='NCHW')
-
+            #return tf.space_to_depth(x, block_size=2, data_format='NCHW')
+            block_size = 2
+            dims = x.get_shape().as_list()
+            print("dims", dims)
+            height = int(dims[2]/block_size)
+            width = int(dims[3]/block_size)
+            depth = dims[1]
+            y = tf.reshape(x, [tf.shape(x)[0], depth, height, block_size, width, block_size])
+            y = tf.transpose(y, perm=[0, 1, 2, 4, 3, 5])
+            y = tf.reshape(y, [tf.shape(x)[0], block_size*block_size*depth, height, width]) #-1])
+            return(y)
+           
         # Layer 1
         x = Conv2D(32, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
         x = BatchNormalization(name='norm_1', axis=1)(x)

@@ -140,7 +140,7 @@ class BatchGenerator(Sequence):
 
         instance_count = 0
 
-        x_batch = np.zeros((r_bound - l_bound, self.config['IMAGE_H'], self.config['IMAGE_W'], 3))                         # input images
+        x_batch = np.zeros((r_bound - l_bound, 3, self.config['IMAGE_H'], self.config['IMAGE_W']))                         # input images
         b_batch = np.zeros((r_bound - l_bound, 1     , 1     , 1    ,  self.config['TRUE_BOX_BUFFER'], 4))   # list of self.config['TRUE_self.config['BOX']_BUFFER'] GT boxes
         y_batch = np.zeros((r_bound - l_bound, self.config['GRID_H'],  self.config['GRID_W'], self.config['BOX'], 4+1+self.config['CLASS']))                # desired network output
 
@@ -202,20 +202,21 @@ class BatchGenerator(Sequence):
                 x_batch[instance_count] = self.norm(img)
             else:
                 # plot image and bounding boxes for sanity check
-                #img2 = img.copy()
+                img2 = copy.deepcopy(img)
+                img2 = np.moveaxis(img2, 0, -1)
                 for obj in all_objs:
                     if obj['xmax'] > obj['xmin'] and obj['ymax'] > obj['ymin']:
-                        cv2.rectangle(img, (obj['xmin'],obj['ymin']), (obj['xmax'],obj['ymax']), (255,0,0), 1)
+                        cv2.rectangle(img2, (obj['xmin'],obj['ymin']), (obj['xmax'],obj['ymax']), (255,0,0), 1)
                         #cv2.putText(img2, obj['name'], 
                         #            (obj['xmin']+2, obj['ymin']+12), 
                         #            0, 1.2e-3 * img.shape[0], 
                         #            (0,255,0), 2)
-                cv2.imwrite("/home/am2266/rds/hpc-work/resizecheck/" + str(self.counter) + ".bmp", img)
-                self.counter += 1        
+                cv2.imwrite("/home/am2266/workspace/basic-yolo-keras/output_imgs/" + str(self.counter) + ".bmp", img2)
+                self.counter += 1
                 x_batch[instance_count] = img
 
             # increase instance counter in current batch
-            instance_count += 1  
+            instance_count += 1
 
         self.counter += 1
         #print ' new batch created', self.counter
