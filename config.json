@@ -2,34 +2,34 @@
     "model" : {
         "architecture":         "Full Yolo",
         "input_size":           416,
-        "anchors":              [0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828],
-        "max_box_per_image":    10,        
-        "labels":               ["raccoon"]
+        "anchors":              [0.26,0.42, 0.33,0.76, 0.42,1.86, 0.57,0.87, 0.87,3.35],
+        "max_box_per_image":    20,        
+        "labels":               ["cow", "person"]
     },
 
     "train": {
-        "train_image_folder":   "/home/andy/github/raccoon_dataset/images/",
-        "train_annot_folder":   "/home/andy/github/raccoon_dataset/annotations/",     
+        "train_image_folder":   "",
+        "train_annot_folder":   "/home/am2266/rds/hpc-work/workspace/sets/dataset_1217/no_balance_416/trainset.json",     
           
-        "train_times":          10,
-        "pretrained_weights":   "full_yolo_raccoon.h5",
-        "batch_size":           16,
+        "train_times":          1,
+        "pretrained_weights":   "weights/weights.0002-loss-0.0284-val_loss-0.0086.h5",
+        "batch_size":           32,
         "learning_rate":        1e-4,
-        "nb_epoch":             50,
-        "warmup_epochs":        3,
-
+        "nb_epoch":             300,
+        "warmup_epochs":        0,
+        "tb_dir": "/home/am2266/basic-yolo-keras/tb",
         "object_scale":         5.0 ,
         "no_object_scale":      1.0,
         "coord_scale":          1.0,
         "class_scale":          1.0,
-
-        "saved_weights_name":   "full_yolo_raccoon.h5",
-        "debug":                true
+        "body_layers_to_train" : ["all"],
+        "saved_weights_name":   "weights",
+        "debug":                false
     },
 
     "valid": {
         "valid_image_folder":   "",
-        "valid_annot_folder":   "",
+        "valid_annot_folder":   "/home/am2266/rds/hpc-work/workspace/sets/dataset_1217/no_balance_416/validset.json",
 
         "valid_times":          1
     }
