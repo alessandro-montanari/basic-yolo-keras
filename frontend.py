@@ -69,8 +69,9 @@ class YOLO(object):
         # so that the model's weights are hosted on CPU memory.
         # Otherwise they may end up hosted on a GPU, which would
         # complicate weight sharing.
-        with tf.device('/cpu:0'):
-
+        if True:
+        #with tf.device('/cpu:0'):
+            
             # make the feature extractor layers
             input_image     = Input(shape=(3, self.input_size, self.input_size))
             self.true_boxes = Input(shape=(1, 1, 1, max_box_per_image , 4))  
@@ -126,7 +127,8 @@ class YOLO(object):
         
         # Replicates the model on N GPUs.
         # This assumes that your machine has N available GPUs.
-        self.parallel_model = multi_gpu_model(self.template_model, gpus=2)
+        #self.parallel_model = multi_gpu_model(self.template_model, gpus=4)
+        self.parallel_model = self.template_model  
 
     def custom_loss(self, y_true, y_pred):
         mask_shape = tf.shape(y_true)[:4]
@@ -578,22 +580,23 @@ class YOLO(object):
         ############################################
 
         if body_layers_to_train:
-            # train only the listed layers in the body
-            for layer in self.parallel_model.layers[1].layers:
-                if layer.name in body_layers_to_train:
-                    layer.trainable = True
+            # if the first element is "all" we train the entire network
+            if body_layers_to_train[0] != "all":
+                # train only the listed layers in the body
+                for layer in self.model.layers[1].layers:
+                    if layer.name in body_layers_to_train:
+                        layer.trainable = True
 
-                    print("Train", layer.name, "in body.")
-                else:
-                    layer.trainable = False
+                        print("Train", layer.name, "in body.")
+                    else:
+                        layer.trainable = False
         else:
             # Freeze the feature extractor part of the network
             self.parallel_model.layers[1].trainable = False
-
         optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         self.parallel_model.compile(loss=self.custom_loss, optimizer=optimizer)
 
-        self.parallel_model.summary()
+        #self.parallel_model.summary()
 
         ############################################
         # Make train and validation generators
