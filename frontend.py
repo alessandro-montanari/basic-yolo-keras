@@ -47,13 +47,14 @@ class YOLO(object):
                        labels, 
                        max_box_per_image,
                        anchors,
-                       create_final_layers=True):
+                       create_final_layers=True,
+                       useleaky=True):
 
         self.input_size = input_size
         
         self.labels   = list(labels)
         self.nb_class = len(self.labels)
-        self.nb_box   = 5
+        self.nb_box   = int(len(anchors)/2)
         self.class_wt = np.ones(self.nb_class, dtype='float32')
         self.anchors  = anchors
 
@@ -74,7 +75,7 @@ class YOLO(object):
         elif architecture == 'MobileNet':
             self.feature_extractor = MobileNetFeature(self.input_size)
         elif architecture == 'Full Yolo':
-            self.feature_extractor = FullYoloFeature(self.input_size)
+            self.feature_extractor = FullYoloFeature(self.input_size, useleaky)
         elif architecture == 'Tiny Yolo':
             self.feature_extractor = TinyYoloFeature(self.input_size)
         elif architecture == 'VGG16':
@@ -122,7 +123,7 @@ class YOLO(object):
         cell_x = tf.to_float(tf.reshape(tf.tile(tf.range(self.grid_w), [self.grid_h]), (1, self.grid_h, self.grid_w, 1, 1)))
         cell_y = tf.transpose(cell_x, (0,2,1,3,4))
 
-        cell_grid = tf.tile(tf.concat([cell_x,cell_y], -1), [self.batch_size, 1, 1, 5, 1])
+        cell_grid = tf.tile(tf.concat([cell_x,cell_y], -1), [self.batch_size, 1, 1, self.nb_box, 1])
         
         coord_mask = tf.zeros(mask_shape)
         conf_mask  = tf.zeros(mask_shape)
@@ -290,10 +291,11 @@ class YOLO(object):
         f = h5py.File(weight_path, "r")
         weights = []
         for name in names:
-            if name.startswith("conv_23"):
+            weights.append(f["model_2/" + name].value)
+            """if name.startswith("conv_23"):
                 weights.append(f["conv_23/" + name].value)
             else:
-                weights.append(f["model_1/" + name].value) 
+                weights.append(f["model_1/" + name].value) """
 
         # Just a quick check to make sure that the weights are in the same order as set_weights wants them
 #        original_weights = layer.get_weights()
@@ -468,7 +470,7 @@ class YOLO(object):
             else:
                 return min(x2,x4) - x3          
 
-    def decode_netout(self, netout, obj_threshold=0.3, nms_threshold=0.3):
+    def decode_netout(self, netout, obj_threshold=0.2, nms_threshold=0.5):
         grid_h, grid_w, nb_box = netout.shape[:3]
 
         boxes = []
