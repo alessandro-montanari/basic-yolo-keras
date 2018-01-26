@@ -42,6 +42,41 @@ class WeightReader:
     def reset(self):
         self.offset = 4
 
+
+def load_darknet_weights(model, path):
+    weight_reader = WeightReader(path)
+
+    weight_reader.reset()
+    nb_conv = 22
+
+    for i in range(1, nb_conv+1):
+        conv_layer = model.get_layer('conv_' + str(i))
+    
+        if i < nb_conv:
+            norm_layer = model.get_layer('norm_' + str(i))
+        
+            size = np.prod(norm_layer.get_weights()[0].shape)
+
+            beta  = weight_reader.read_bytes(size)
+            gamma = weight_reader.read_bytes(size)
+            mean  = weight_reader.read_bytes(size)
+            var   = weight_reader.read_bytes(size)
+
+            weights = norm_layer.set_weights([gamma, beta, mean, var])       
+        
+        if len(conv_layer.get_weights()) > 1:
+            bias   = weight_reader.read_bytes(np.prod(conv_layer.get_weights()[1].shape))
+            kernel = weight_reader.read_bytes(np.prod(conv_layer.get_weights()[0].shape))
+            kernel = kernel.reshape(list(reversed(conv_layer.get_weights()[0].shape)))
+            kernel = kernel.transpose([2,3,1,0])
+            conv_layer.set_weights([kernel, bias])
+        else:
+            kernel = weight_reader.read_bytes(np.prod(conv_layer.get_weights()[0].shape))
+            kernel = kernel.reshape(list(reversed(conv_layer.get_weights()[0].shape)))
+            kernel = kernel.transpose([2,3,1,0])
+            conv_layer.set_weights([kernel])
+
+
 def normalize(image):
     image = image / 255.
     

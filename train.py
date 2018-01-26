@@ -48,8 +48,8 @@ from preprocessing import parse_annotation
 from frontend import YOLO
 import json
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+#os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+#os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 argparser = argparse.ArgumentParser(
     description='Train and validate YOLO_v2 model on any dataset')
@@ -121,7 +121,7 @@ def _main_(args):
 
     if os.path.exists(config['train']['pretrained_weights']):
         print("Loading pre-trained weights in", config['train']['pretrained_weights'])
-        yolo.load_weights(config['train']['pretrained_weights'])
+        yolo.load_weights_multi_gpu(config['train']['pretrained_weights'])
 
     ###############################
     #   Start the training process 

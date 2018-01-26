@@ -19,6 +19,7 @@ from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeN
 
 class WeightsSaver(Callback):
     def __init__(self, model, path):
+        super().__init__()
         self.model = model
         self.path = path
 
@@ -126,7 +127,7 @@ class YOLO(object):
         
         # Replicates the model on N GPUs.
         # This assumes that your machine has N available GPUs.
-        self.parallel_model = multi_gpu_model(self.template_model, gpus=2)
+        self.parallel_model = multi_gpu_model(self.template_model, gpus=4)
 
     def custom_loss(self, y_true, y_pred):
         mask_shape = tf.shape(y_true)[:4]
@@ -326,6 +327,35 @@ class YOLO(object):
         The load happens by layer name so the weights need to have that.
         """
         self.template_model.load_weights(weight_path, by_name=True)
+
+    def load_weights_multi_gpu(self, weight_path):
+	# Get the names of the weights for the entire model
+        layer = self.template_model
+        symbolic_weights = []
+        for l in layer.layers:
+            if len(l.weights) > 0:
+                for el in l.weights:
+                    symbolic_weights.append(el)
+        names = [ el.name for el in symbolic_weights]
+        #print(names)
+
+        #print("Sum conv_22", np.sum(self.template_model.get_layer("model_1").get_layer("conv_22").get_weights()))
+        #print("Sum norm_22", np.sum(self.template_model.get_layer("model_1").get_layer("norm_22").get_weights()))
+        #print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[0]))
+        #print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[1]))
+
+        # Get the weights from the file in the same order set_weights wants them
+        f = h5py.File(weight_path, "r")
+        weights = []
+        for name in names:
+            weights.append(f["model_2/" + name].value)
+
+        layer.set_weights(weights)
+
+        #print("Sum conv_22", np.sum(self.template_model.get_layer("model_1").get_layer("conv_22").get_weights()))
+        #print("Sum norm_22", np.sum(self.template_model.get_layer("model_1").get_layer("norm_22").get_weights()))
+        #print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[0]))
+        #print("Sum conv_23", np.sum(self.template_model.get_layer("conv_23").get_weights()[1]))
 
 
     def predict(self, image):
@@ -578,17 +608,22 @@ class YOLO(object):
         ############################################
 
         if body_layers_to_train:
-            # train only the listed layers in the body
-            for layer in self.parallel_model.layers[1].layers:
-                if layer.name in body_layers_to_train:
-                    layer.trainable = True
+            # if the first element is "all" we train the entire network
+            if body_layers_to_train[0] != "all":   
+                # train only the listed layers in the body
+                for layer in self.model.layers[1].layers:
+                    if layer.name in body_layers_to_train:
+                        layer.trainable = True
 
-                    print("Train", layer.name, "in body.")
-                else:
-                    layer.trainable = False
+                        print("Train", layer.name, "in body.")
+                    else:
+                        layer.trainable = False
         else:
             # Freeze the feature extractor part of the network
             self.parallel_model.layers[1].trainable = False
+
+        # Save model via the template model (which shares the same weights):
+        weights_saver = WeightsSaver(model = self.template_model, path = saved_weights_name)
 
         optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
         self.parallel_model.compile(loss=self.custom_loss, optimizer=optimizer)
@@ -627,9 +662,6 @@ class YOLO(object):
         ############################################
         batch_logger = NBatchLogger(display=200)
 
-        # Save model via the template model (which shares the same weights):
-        weights_saver = WeightsSaver(model = self.template_model, path = saved_weights_name)
-
         early_stop = EarlyStopping(monitor='val_loss', 
                            min_delta=0.001, 
                            patience=3, 
@@ -662,6 +694,6 @@ class YOLO(object):
                                  validation_data  = valid_batch,
                                  validation_steps = len(valid_batch) * valid_times,
                                  callbacks        = [batch_logger, weights_saver, tensorboard], 
-                                 workers 	  = 3,
-                                 max_queue_size   = 6)
+                                 workers 	  = 4,
+                                 max_queue_size   = 8)
 

@@ -7,6 +7,7 @@ from keras.applications.mobilenet import MobileNet
 from keras.applications import InceptionV3
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet50 import ResNet50
+from utils import load_darknet_weights
 
 FULL_YOLO_BACKEND_PATH  = "full_yolo_backend.h5"   # should be hosted on a server
 TINY_YOLO_BACKEND_PATH  = "tiny_yolo_backend.h5"   # should be hosted on a server
@@ -15,6 +16,8 @@ MOBILENET_BACKEND_PATH  = "mobilenet_backend.h5"   # should be hosted on a serve
 INCEPTION3_BACKEND_PATH = "inception_backend.h5"   # should be hosted on a server
 VGG16_BACKEND_PATH      = "vgg16_backend.h5"       # should be hosted on a server
 RESNET50_BACKEND_PATH   = "resnet50_backend.h5"    # should be hosted on a server
+
+DARKNET_WEIGHTS 	= "yolo-voc.weights"
 
 class BaseFeatureExtractor(object):
     """docstring for ClassName"""
@@ -166,6 +169,8 @@ class FullYoloFeature(BaseFeatureExtractor):
         self.feature_extractor = Model(input_image, x)  
         self.feature_extractor.load_weights(FULL_YOLO_BACKEND_PATH)
 
+        #load_darknet_weights(self.feature_extractor, "yolo-voc.weights")
+	
         print("Feature extractor summary")
         self.feature_extractor.summary()
     def normalize(self, image):
@@ -290,8 +295,8 @@ class Inception3Feature(BaseFeatureExtractor):
     def __init__(self, input_size):
         input_image = Input(shape=(input_size, input_size, 3))
 
-        inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False)
-        inception.load_weights(INCEPTION3_BACKEND_PATH)
+        inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False, weights='imagenet')
+        #inception.load_weights(INCEPTION3_BACKEND_PATH)
 
         x = inception(input_image)
 
