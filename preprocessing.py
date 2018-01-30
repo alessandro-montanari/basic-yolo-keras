@@ -233,7 +233,7 @@ class BatchGenerator(Sequence):
         image_name = train_instance['filename']
         image = cv2.imread(image_name)
 
-        if image is None: print 'Cannot find ', image_name
+        if image is None: print('Cannot find ', image_name)
 
         h, w, c = image.shape
         all_objs = copy.deepcopy(train_instance['object'])
