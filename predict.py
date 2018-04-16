@@ -2,6 +2,8 @@
 
 import argparse
 import os
+from os import listdir
+from os.path import isfile, join
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -11,7 +13,7 @@ from frontend import YOLO
 import json
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]=""
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 argparser = argparse.ArgumentParser(
     description='Train and validate YOLO_v2 model on any dataset')
@@ -54,7 +56,7 @@ def _main_(args):
     #   Load trained weights
     ###############################    
 
-    print weights_path
+    print(weights_path)
     yolo.load_weights(weights_path)
 
     ###############################
@@ -86,13 +88,15 @@ def _main_(args):
         video_reader.release()
         video_writer.release()  
     else:
-        image = cv2.imread(image_path)
-        boxes = yolo.predict(image)
-        image = draw_boxes(image, boxes, config['model']['labels'])
+        onlyfiles = [join(image_path,f) for f in listdir(image_path) if isfile(join(image_path, f))]
+        for img_path in onlyfiles:
+            image = cv2.imread(img_path)
+            boxes = yolo.predict(image)
+            image = draw_boxes(image, boxes, config['model']['labels'])
 
-        print len(boxes), 'boxes are found'
+            print(len(boxes), 'boxes are found')
 
-        cv2.imwrite(image_path[:-4] + '_detected' + image_path[-4:], image)
+            cv2.imwrite(img_path[:-4] + '_detected' + img_path[-4:], image)
 
 if __name__ == '__main__':
     args = argparser.parse_args()
