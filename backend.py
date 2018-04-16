@@ -8,8 +8,8 @@ from keras.applications import InceptionV3
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet50 import ResNet50
 
-FULL_YOLO_BACKEND_PATH  = "full_yolo_backend.h5"   # should be hosted on a server
-TINY_YOLO_BACKEND_PATH  = "tiny_yolo_backend.h5"   # should be hosted on a server
+FULL_YOLO_BACKEND_PATH  = "/media/HD01/workspace/basic-yolo-keras/full_yolo_backend.h5"   # should be hosted on a server
+TINY_YOLO_BACKEND_PATH  = "/media/HD01/workspace/basic-yolo-keras/tiny_yolo_backend.h5"   # should be hosted on a server
 SQUEEZENET_BACKEND_PATH = "squeezenet_backend.h5"  # should be hosted on a server
 MOBILENET_BACKEND_PATH  = "mobilenet_backend.h5"   # should be hosted on a server
 INCEPTION3_BACKEND_PATH = "inception_backend.h5"   # should be hosted on a server
@@ -325,7 +325,7 @@ class TinyYoloFeature(BaseFeatureExtractor):
             x = BatchNormalization(name='norm_' + str(i+7))(x)
             x = LeakyReLU(alpha=0.1)(x)
 
-        self.feature_extractor = Model(input_image, x)  
+        self.feature_extractor = Model(input_image, x)
         self.feature_extractor.load_weights(TINY_YOLO_BACKEND_PATH)
 
     def normalize(self, image):
@@ -336,7 +336,7 @@ class MobileNetFeature(BaseFeatureExtractor):
     def __init__(self, input_size):
         input_image = Input(shape=(input_size, input_size, 3))
 
-        mobilenet = MobileNet(input_shape=(224,224,3), include_top=False)
+        mobilenet = MobileNet(input_shape=(input_size,input_size,3), include_top=False, weights = None)
         mobilenet.load_weights(MOBILENET_BACKEND_PATH)
 
         x = mobilenet(input_image)
@@ -415,7 +415,7 @@ class Inception3Feature(BaseFeatureExtractor):
         input_image = Input(shape=(input_size, input_size, 3))
 
         inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False)
-        inception.load_weights(INCEPTION3_BACKEND_PATH)
+        #inception.load_weights(INCEPTION3_BACKEND_PATH)
 
         x = inception(input_image)
 

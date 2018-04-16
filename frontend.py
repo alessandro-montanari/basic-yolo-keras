@@ -280,12 +280,12 @@ class YOLO(object):
                 for el in l.weights:
                     symbolic_weights.append(el)
         names = [ el.name for el in symbolic_weights]
-        #print(names)
+        print(names)
 
-        print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
-        print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
+#        print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
+#        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+#        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
        
         # Get the weights from the file in the same order set_weights wants them
         f = h5py.File(weight_path, "r")
@@ -304,10 +304,10 @@ class YOLO(object):
 
         layer.set_weights(weights)
 
-        print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
-        print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
-        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
+ #       print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
+ #       print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+ #       print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
 
 
     def load_head_weights(self, weight_path):
@@ -321,7 +321,7 @@ class YOLO(object):
     def predict(self, image):
         image = cv2.resize(image, (self.input_size, self.input_size))
         image = self.feature_extractor.normalize(image)
-
+        print(image.shape)
         input_image = image[:,:,::-1]
         input_image = np.expand_dims(input_image, 0)
         dummy_array = dummy_array = np.zeros((1,1,1,1,self.max_box_per_image,4))
@@ -522,6 +522,7 @@ class YOLO(object):
         return boxes
 
     def sigmoid(self, x):
+#        xx = np.array(x, dtype=np.float128)
         return 1. / (1. + np.exp(-x))
 
     def softmax(self, x, axis=-1, t=-100.):
