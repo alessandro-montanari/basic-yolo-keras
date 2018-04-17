@@ -14,7 +14,10 @@ from keras.optimizers import SGD, Adam, RMSprop
 from preprocessing import BatchGenerator
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint, TensorBoard
 from utils import BoundBox
-from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature
+from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature, Densenet121Feature
+import time
+# We use the default_timer from timeit because it gives the most accurate measure based on the platform we run it
+from timeit import default_timer as timer
 
 class WeightsSaver(Callback):
     def __init__(self, model, path):
@@ -47,13 +50,14 @@ class YOLO(object):
                        labels, 
                        max_box_per_image,
                        anchors,
-                       create_final_layers=True):
+                       create_final_layers = True,
+                       prediction_only = False):
 
         self.input_size = input_size
         
         self.labels   = list(labels)
         self.nb_class = len(self.labels)
-        self.nb_box   = 5
+        self.nb_box   = int(len(anchors)/2)
         self.class_wt = np.ones(self.nb_class, dtype='float32')
         self.anchors  = anchors
 
@@ -81,6 +85,8 @@ class YOLO(object):
             self.feature_extractor = VGG16Feature(self.input_size)
         elif architecture == 'ResNet50':
             self.feature_extractor = ResNet50Feature(self.input_size)
+	    elif architecture == 'Densenet121':
+  	        self.feature_extractor = Densenet121Feature(self.input_size)
         else:
             raise Exception('Architecture not supported! Only support Full Yolo, Tiny Yolo, MobileNet, SqueezeNet, VGG16, ResNet50, and Inception3 at the moment!')
 
@@ -113,6 +119,11 @@ class YOLO(object):
             # make a model with only the architecture's body
             self.model = Model([input_image, self.true_boxes], features)    # I pass also the boxes even if useless TODO check this comment
 
+        # If we are interested only in prediction we set trainable to false for all layers
+        if prediction_only:
+            for layer in self.model.layers:
+                layer.trainable = False
+
         # print a summary of the whole model
         self.model.summary()
 
@@ -122,7 +133,7 @@ class YOLO(object):
         cell_x = tf.to_float(tf.reshape(tf.tile(tf.range(self.grid_w), [self.grid_h]), (1, self.grid_h, self.grid_w, 1, 1)))
         cell_y = tf.transpose(cell_x, (0,2,1,3,4))
 
-        cell_grid = tf.tile(tf.concat([cell_x,cell_y], -1), [self.batch_size, 1, 1, 5, 1])
+        cell_grid = tf.tile(tf.concat([cell_x,cell_y], -1), [self.batch_size, 1, 1, self.nb_box, 1])
         
         coord_mask = tf.zeros(mask_shape)
         conf_mask  = tf.zeros(mask_shape)
@@ -302,6 +313,9 @@ class YOLO(object):
 
         layer.set_weights(weights)
 
+        # A bit of cleaning
+        del weights
+        f.close()
         print("Sum conv_22", np.sum(self.model.get_layer("model_1").get_layer("conv_22").get_weights()))
         print("Sum norm_22", np.sum(self.model.get_layer("model_1").get_layer("norm_22").get_weights()))
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
@@ -324,10 +338,12 @@ class YOLO(object):
         input_image = np.expand_dims(input_image, 0)
         dummy_array = dummy_array = np.zeros((1,1,1,1,self.max_box_per_image,4))
 
+        start = timer()
         netout = self.model.predict([input_image, dummy_array])[0]
         boxes  = self.decode_netout(netout)
-        
-        return boxes
+        duration = (timer() - start)
+
+        return boxes, duration
 
     def predict_batches(self, predict_imgs, batch_size):
         """

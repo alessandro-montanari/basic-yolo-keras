@@ -7,8 +7,9 @@ from keras.applications.mobilenet import MobileNet
 from keras.applications import InceptionV3
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet50 import ResNet50
+from keras.applications.densenet import DenseNet121
 
-FULL_YOLO_BACKEND_PATH  = "full_yolo_backend.h5"   # should be hosted on a server
+FULL_YOLO_BACKEND_PATH  = "/media/mydrive/full_yolo_backend.h5"   # should be hosted on a server
 TINY_YOLO_BACKEND_PATH  = "tiny_yolo_backend.h5"   # should be hosted on a server
 SQUEEZENET_BACKEND_PATH = "squeezenet_backend.h5"  # should be hosted on a server
 MOBILENET_BACKEND_PATH  = "mobilenet_backend.h5"   # should be hosted on a server
@@ -212,8 +213,8 @@ class MobileNetFeature(BaseFeatureExtractor):
     def __init__(self, input_size):
         input_image = Input(shape=(input_size, input_size, 3))
 
-        mobilenet = MobileNet(input_shape=(224,224,3), include_top=False)
-        mobilenet.load_weights(MOBILENET_BACKEND_PATH)
+        mobilenet = MobileNet(input_shape=(input_size,input_size,3), include_top=False, weights = 'imagenet')
+        #mobilenet.load_weights(MOBILENET_BACKEND_PATH)
 
         x = mobilenet(input_image)
 
@@ -290,8 +291,8 @@ class Inception3Feature(BaseFeatureExtractor):
     def __init__(self, input_size):
         input_image = Input(shape=(input_size, input_size, 3))
 
-        inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False)
-        inception.load_weights(INCEPTION3_BACKEND_PATH)
+        inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False, weights='imagenet')
+#        inception.load_weights(INCEPTION3_BACKEND_PATH)
 
         x = inception(input_image)
 
@@ -340,3 +341,20 @@ class ResNet50Feature(BaseFeatureExtractor):
         image[..., 2] -= 123.68
 
         return image 
+
+class Densenet121Feature(BaseFeatureExtractor):
+    """docstring for ClassName"""
+    def __init__(self, input_size):
+        input_image = Input(shape=(input_size, input_size, 3))
+
+        dense = DenseNet121(input_shape=(input_size,input_size,3), include_top=False, weights='imagenet')
+        x = dense(input_image)
+
+        self.feature_extractor = Model(input_image, x)
+
+    def normalize(self, image):
+        image = image / 255.
+        image = image - 0.5
+        image = image * 2.
+
+        return image
