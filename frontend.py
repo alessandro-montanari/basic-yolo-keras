@@ -14,7 +14,10 @@ from keras.optimizers import SGD, Adam, RMSprop
 from preprocessing import BatchGenerator
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint, TensorBoard
 from utils import BoundBox
-from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature
+from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature, Densenet121Feature
+import time
+# We use the default_timer from timeit because it gives the most accurate measure based on the platform we run it
+from timeit import default_timer as timer
 
 class WeightsSaver(Callback):
     def __init__(self, model, path):
@@ -47,8 +50,9 @@ class YOLO(object):
                        labels, 
                        max_box_per_image,
                        anchors,
-                       create_final_layers=True,
-                       useleaky=True):
+                       create_final_layers = True,
+                       useleaky = True,
+                       prediction_only = False):
 
         self.input_size = input_size
         
@@ -82,6 +86,8 @@ class YOLO(object):
             self.feature_extractor = VGG16Feature(self.input_size)
         elif architecture == 'ResNet50':
             self.feature_extractor = ResNet50Feature(self.input_size)
+	    elif architecture == 'Densenet121':
+  	        self.feature_extractor = Densenet121Feature(self.input_size)
         else:
             raise Exception('Architecture not supported! Only support Full Yolo, Tiny Yolo, MobileNet, SqueezeNet, VGG16, ResNet50, and Inception3 at the moment!')
 
@@ -113,6 +119,11 @@ class YOLO(object):
         else:
             # make a model with only the architecture's body
             self.model = Model([input_image, self.true_boxes], features)    # I pass also the boxes even if useless TODO check this comment
+
+        # If we are interested only in prediction we set trainable to false for all layers
+        if prediction_only:
+            for layer in self.model.layers:
+                layer.trainable = False
 
         # print a summary of the whole model
         self.model.summary()
@@ -304,10 +315,13 @@ class YOLO(object):
 
         layer.set_weights(weights)
 
+        # A bit of cleaning
+        del weights
+        f.close()
         #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
- #       print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
- #       print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
- #       print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        #print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
+        #print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+        #print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
 
 
     def load_head_weights(self, weight_path):
@@ -326,10 +340,12 @@ class YOLO(object):
         input_image = np.expand_dims(input_image, 0)
         dummy_array = dummy_array = np.zeros((1,1,1,1,self.max_box_per_image,4))
 
+        start = timer()
         netout = self.model.predict([input_image, dummy_array])[0]
         boxes  = self.decode_netout(netout)
-        
-        return boxes
+        duration = (timer() - start)
+
+        return boxes, duration
 
     def predict_batches(self, predict_imgs, batch_size):
         """
@@ -383,11 +399,8 @@ class YOLO(object):
 
         netout, b_batch, y_batch: h5 files opened before calling this method.
         """
-        # TODO:
-        # - create bottleneck generation with batches
-        # - save the three components (netout, b_batch, y_batch) on a single h5 file
 
-        #TODO We support only one element per batch
+        # We support only one element per batch
         self.batch_size = 1
 
         ############################################
@@ -407,7 +420,7 @@ class YOLO(object):
             'TRUE_BOX_BUFFER' : self.max_box_per_image,
         }    
 
-        # TODO probably we can enable shuffle and jitter but double check
+        # probably we can enable shuffle and jitter but double check
         predict_batch = BatchGenerator(predict_imgs, 
                                      generator_config, 
                                      norm=self.feature_extractor.normalize,
@@ -633,7 +646,7 @@ class YOLO(object):
                                      mode = 'auto',
                                      save_weights_only = False,
                                      period = 1)
-        # TODO change the path for tensorboard logs
+
         tb_counter  = len([log for log in os.listdir(tensorboard_dir) if 'yolo' in log]) + 1
         tensorboard = TensorBoard(log_dir=os.path.join(tensorboard_dir, 'yolo' + '_' + str(tb_counter)), 
                                   histogram_freq=0, 
