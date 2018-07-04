@@ -91,9 +91,13 @@ def _main_(args):
         onlyfiles = [join(image_path,f) for f in listdir(image_path) if isfile(join(image_path, f))]
         for img_path in onlyfiles:
             image = cv2.imread(img_path)
-            boxes = yolo.predict(image)
+            image_resized = cv2.resize(image, (yolo.input_size, yolo.input_size), interpolation = cv2.INTER_AREA)
+            cv2.imwrite(img_path[:-4] + '_resized' + img_path[-4:], image_resized)
+
+            boxes, _ = yolo.predict(image)
             image = draw_boxes(image, boxes, config['model']['labels'])
 
+            print(img_path)
             print(len(boxes), 'boxes are found')
 
             cv2.imwrite(img_path[:-4] + '_detected' + img_path[-4:], image)

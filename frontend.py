@@ -14,7 +14,7 @@ from keras.optimizers import SGD, Adam, RMSprop
 from preprocessing import BatchGenerator
 from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint, TensorBoard
 from utils import BoundBox
-from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature, Densenet121Feature
+from backend import TinyYoloFeature, FullYoloFeature, MobileNetFeature, SqueezeNetFeature, Inception3Feature, VGG16Feature, ResNet50Feature
 import time
 # We use the default_timer from timeit because it gives the most accurate measure based on the platform we run it
 from timeit import default_timer as timer
@@ -86,8 +86,8 @@ class YOLO(object):
             self.feature_extractor = VGG16Feature(self.input_size)
         elif architecture == 'ResNet50':
             self.feature_extractor = ResNet50Feature(self.input_size)
-	elif architecture == 'Densenet121':
-  	        self.feature_extractor = Densenet121Feature(self.input_size)
+#        elif architecture == 'Densenet121':
+ # 	        self.feature_extractor = Densenet121Feature(self.input_size)
         else:
             raise Exception('Architecture not supported! Only support Full Yolo, Tiny Yolo, MobileNet, SqueezeNet, VGG16, ResNet50, and Inception3 at the moment!')
 
@@ -295,8 +295,8 @@ class YOLO(object):
 
         #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
 #        print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
-#        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
-#        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
        
         # Get the weights from the file in the same order set_weights wants them
         f = h5py.File(weight_path, "r")
@@ -320,8 +320,8 @@ class YOLO(object):
         f.close()
         #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
         #print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
-        #print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
-        #print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
+        print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
 
 
     def load_head_weights(self, weight_path):
@@ -333,9 +333,8 @@ class YOLO(object):
 
 
     def predict(self, image):
-        image = cv2.resize(image, (self.input_size, self.input_size))
+        image = cv2.resize(image, (self.input_size, self.input_size), interpolation = cv2.INTER_AREA)
         image = self.feature_extractor.normalize(image)
-        print(image.shape)
         input_image = image[:,:,::-1]
         input_image = np.expand_dims(input_image, 0)
         dummy_array = dummy_array = np.zeros((1,1,1,1,self.max_box_per_image,4))

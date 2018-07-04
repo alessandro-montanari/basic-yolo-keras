@@ -253,7 +253,7 @@ class BatchGenerator(Sequence):
 
                 # resize the image and bbs to standard size
                 if(self.config['IMAGE_W']!= w and self.config['IMAGE_H']!= h):
-                    image_aug = ia.imresize_single_image(image_aug, (self.config['IMAGE_W'], self.config['IMAGE_H']))
+                    image_aug = ia.imresize_single_image(image_aug, (self.config['IMAGE_W'], self.config['IMAGE_H']), interpolation = "area")
                     bbs_aug = bbs_aug.on(image_aug)
 
                 image_aug = image_aug[:,:,::-1]
@@ -283,7 +283,7 @@ class BatchGenerator(Sequence):
         else:
             # resize the image and bbs to standard size
             if(self.config['IMAGE_W']!= w and self.config['IMAGE_H']!= h):
-                image = ia.imresize_single_image(image, (self.config['IMAGE_W'], self.config['IMAGE_H']))
+                image = ia.imresize_single_image(image, (self.config['IMAGE_W'], self.config['IMAGE_H']), interpolation = "area")
                 bbs   = bbs.on(image)
 
                 classname   = all_objs[0]["name"]

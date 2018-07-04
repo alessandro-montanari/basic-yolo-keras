@@ -7,10 +7,10 @@ from keras.applications.mobilenet import MobileNet
 from keras.applications import InceptionV3
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet50 import ResNet50
-from keras.applications.densenet import DenseNet121
+#from keras.applications.densenet import DenseNet121
 
 FULL_YOLO_BACKEND_PATH  = "/media/mydrive/full_yolo_backend.h5"   # should be hosted on a server
-TINY_YOLO_BACKEND_PATH  = "tiny_yolo_backend.h5"   # should be hosted on a server
+TINY_YOLO_BACKEND_PATH  = "/media/HD01/workspace/basic-yolo-keras/tiny_yolo_backend.h5"   # should be hosted on a server
 SQUEEZENET_BACKEND_PATH = "squeezenet_backend.h5"  # should be hosted on a server
 MOBILENET_BACKEND_PATH  = "mobilenet_backend.h5"   # should be hosted on a server
 INCEPTION3_BACKEND_PATH = "inception_backend.h5"   # should be hosted on a server
