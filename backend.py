@@ -1,15 +1,16 @@
 from keras.models import Model
 import tensorflow as tf
-from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, Flatten, Dense, Lambda
+from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, Flatten, Dense, Lambda, Add, Lambda
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import concatenate
 from keras.applications.mobilenet import MobileNet
 from keras.applications import InceptionV3
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet50 import ResNet50
+#from keras.applications.densenet import DenseNet121
 
-FULL_YOLO_BACKEND_PATH  = "full_yolo_backend.h5"   # should be hosted on a server
-TINY_YOLO_BACKEND_PATH  = "tiny_yolo_backend.h5"   # should be hosted on a server
+FULL_YOLO_BACKEND_PATH  = "/media/mydrive/full_yolo_backend.h5"   # should be hosted on a server
+TINY_YOLO_BACKEND_PATH  = "/media/HD01/workspace/basic-yolo-keras/tiny_yolo_backend.h5"   # should be hosted on a server
 SQUEEZENET_BACKEND_PATH = "squeezenet_backend.h5"  # should be hosted on a server
 MOBILENET_BACKEND_PATH  = "mobilenet_backend.h5"   # should be hosted on a server
 INCEPTION3_BACKEND_PATH = "inception_backend.h5"   # should be hosted on a server
@@ -35,171 +36,317 @@ class BaseFeatureExtractor(object):
 
 class FullYoloFeature(BaseFeatureExtractor):
     """docstring for ClassName"""
-    def __init__(self, input_size):
+    def __init__(self, input_size, useleaky):
         input_image = Input(shape=(input_size, input_size, 3))
 
         # the function to implement the orgnization layer (thanks to github.com/allanzelener/YAD2K)
         def space_to_depth_x2(x):
             return tf.space_to_depth(x, block_size=2)
 
-        # Layer 1
-        x = Conv2D(32, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
-        x = BatchNormalization(name='norm_1')(x)
-        x = LeakyReLU(alpha=0.1)(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
+        if(useleaky):
+            # Layer 1
+            x = Conv2D(32, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
+            x = BatchNormalization(name='norm_1')(x)
+            x = LeakyReLU(alpha=0.1)(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
 
-        # Layer 2
-        x = Conv2D(64, (3,3), strides=(1,1), padding='same', name='conv_2', use_bias=False)(x)
-        x = BatchNormalization(name='norm_2')(x)
-        x = LeakyReLU(alpha=0.1)(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
+            # Layer 2
+            x = Conv2D(64, (3,3), strides=(1,1), padding='same', name='conv_2', use_bias=False)(x)
+            x = BatchNormalization(name='norm_2')(x)
+            x = LeakyReLU(alpha=0.1)(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
 
-        # Layer 3
-        x = Conv2D(128, (3,3), strides=(1,1), padding='same', name='conv_3', use_bias=False)(x)
-        x = BatchNormalization(name='norm_3')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 3
+            x = Conv2D(128, (3,3), strides=(1,1), padding='same', name='conv_3', use_bias=False)(x)
+            x = BatchNormalization(name='norm_3')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 4
-        x = Conv2D(64, (1,1), strides=(1,1), padding='same', name='conv_4', use_bias=False)(x)
-        x = BatchNormalization(name='norm_4')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 4
+            x = Conv2D(64, (1,1), strides=(1,1), padding='same', name='conv_4', use_bias=False)(x)
+            x = BatchNormalization(name='norm_4')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 5
-        x = Conv2D(128, (3,3), strides=(1,1), padding='same', name='conv_5', use_bias=False)(x)
-        x = BatchNormalization(name='norm_5')(x)
-        x = LeakyReLU(alpha=0.1)(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
+            # Layer 5
+            x = Conv2D(128, (3,3), strides=(1,1), padding='same', name='conv_5', use_bias=False)(x)
+            x = BatchNormalization(name='norm_5')(x)
+            x = LeakyReLU(alpha=0.1)(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
 
-        # Layer 6
-        x = Conv2D(256, (3,3), strides=(1,1), padding='same', name='conv_6', use_bias=False)(x)
-        x = BatchNormalization(name='norm_6')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 6
+            x = Conv2D(256, (3,3), strides=(1,1), padding='same', name='conv_6', use_bias=False)(x)
+            x = BatchNormalization(name='norm_6')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 7
-        x = Conv2D(128, (1,1), strides=(1,1), padding='same', name='conv_7', use_bias=False)(x)
-        x = BatchNormalization(name='norm_7')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 7
+            x = Conv2D(128, (1,1), strides=(1,1), padding='same', name='conv_7', use_bias=False)(x)
+            x = BatchNormalization(name='norm_7')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 8
-        x = Conv2D(256, (3,3), strides=(1,1), padding='same', name='conv_8', use_bias=False)(x)
-        x = BatchNormalization(name='norm_8')(x)
-        x = LeakyReLU(alpha=0.1)(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
+            # Layer 8
+            x = Conv2D(256, (3,3), strides=(1,1), padding='same', name='conv_8', use_bias=False)(x)
+            x = BatchNormalization(name='norm_8')(x)
+            x = LeakyReLU(alpha=0.1)(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
 
-        # Layer 9
-        x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_9', use_bias=False)(x)
-        x = BatchNormalization(name='norm_9')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 9
+            x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_9', use_bias=False)(x)
+            x = BatchNormalization(name='norm_9')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 10
-        x = Conv2D(256, (1,1), strides=(1,1), padding='same', name='conv_10', use_bias=False)(x)
-        x = BatchNormalization(name='norm_10')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 10
+            x = Conv2D(256, (1,1), strides=(1,1), padding='same', name='conv_10', use_bias=False)(x)
+            x = BatchNormalization(name='norm_10')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 11
-        x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_11', use_bias=False)(x)
-        x = BatchNormalization(name='norm_11')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 11
+            x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_11', use_bias=False)(x)
+            x = BatchNormalization(name='norm_11')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 12
-        x = Conv2D(256, (1,1), strides=(1,1), padding='same', name='conv_12', use_bias=False)(x)
-        x = BatchNormalization(name='norm_12')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 12
+            x = Conv2D(256, (1,1), strides=(1,1), padding='same', name='conv_12', use_bias=False)(x)
+            x = BatchNormalization(name='norm_12')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 13
-        x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_13', use_bias=False)(x)
-        x = BatchNormalization(name='norm_13')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 13
+            x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_13', use_bias=False)(x)
+            x = BatchNormalization(name='norm_13')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        skip_connection = x
+            skip_connection = x
 
-        x = MaxPooling2D(pool_size=(2, 2))(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
 
-        # Layer 14
-        x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_14', use_bias=False)(x)
-        x = BatchNormalization(name='norm_14')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 14
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_14', use_bias=False)(x)
+            x = BatchNormalization(name='norm_14')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 15
-        x = Conv2D(512, (1,1), strides=(1,1), padding='same', name='conv_15', use_bias=False)(x)
-        x = BatchNormalization(name='norm_15')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 15
+            x = Conv2D(512, (1,1), strides=(1,1), padding='same', name='conv_15', use_bias=False)(x)
+            x = BatchNormalization(name='norm_15')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 16
-        x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_16', use_bias=False)(x)
-        x = BatchNormalization(name='norm_16')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 16
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_16', use_bias=False)(x)
+            x = BatchNormalization(name='norm_16')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 17
-        x = Conv2D(512, (1,1), strides=(1,1), padding='same', name='conv_17', use_bias=False)(x)
-        x = BatchNormalization(name='norm_17')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 17
+            x = Conv2D(512, (1,1), strides=(1,1), padding='same', name='conv_17', use_bias=False)(x)
+            x = BatchNormalization(name='norm_17')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 18
-        x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_18', use_bias=False)(x)
-        x = BatchNormalization(name='norm_18')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 18
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_18', use_bias=False)(x)
+            x = BatchNormalization(name='norm_18')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 19
-        x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_19', use_bias=False)(x)
-        x = BatchNormalization(name='norm_19')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 19
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_19', use_bias=False)(x)
+            x = BatchNormalization(name='norm_19')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 20
-        x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_20', use_bias=False)(x)
-        x = BatchNormalization(name='norm_20')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 20
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_20', use_bias=False)(x)
+            x = BatchNormalization(name='norm_20')(x)
+            x = LeakyReLU(alpha=0.1)(x)
 
-        # Layer 21
-        skip_connection = Conv2D(64, (1,1), strides=(1,1), padding='same', name='conv_21', use_bias=False)(skip_connection)
-        skip_connection = BatchNormalization(name='norm_21')(skip_connection)
-        skip_connection = LeakyReLU(alpha=0.1)(skip_connection)
-        skip_connection = Lambda(space_to_depth_x2)(skip_connection)
+            # Layer 21
+            skip_connection = Conv2D(64, (1,1), strides=(1,1), padding='same', name='conv_21', use_bias=False)(skip_connection)
+            skip_connection = BatchNormalization(name='norm_21')(skip_connection)
+            skip_connection = LeakyReLU(alpha=0.1)(skip_connection)
+            skip_connection = Lambda(space_to_depth_x2)(skip_connection)
 
-        x = concatenate([skip_connection, x])
+            x = concatenate([skip_connection, x])
 
-        # Layer 22
-        x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_22', use_bias=False)(x)
-        x = BatchNormalization(name='norm_22')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+            # Layer 22
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_22', use_bias=False)(x)
+            x = BatchNormalization(name='norm_22')(x)
+            x = LeakyReLU(alpha=0.1)(x)
+
+        else:
+            # don't use LeakyReLU for inference
+            # Layer 1
+            x = Conv2D(32, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
+            x = BatchNormalization(name='norm_1')(x)
+            x = Activation('relu')(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
+
+            # Layer 2
+            x = Conv2D(64, (3,3), strides=(1,1), padding='same', name='conv_2', use_bias=False)(x)
+            x = BatchNormalization(name='norm_2')(x)
+            x = Activation('relu')(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
+
+            # Layer 3
+            x = Conv2D(128, (3,3), strides=(1,1), padding='same', name='conv_3', use_bias=False)(x)
+            x = BatchNormalization(name='norm_3')(x)
+            x = Activation('relu')(x)
+
+            # Layer 4
+            x = Conv2D(64, (1,1), strides=(1,1), padding='same', name='conv_4', use_bias=False)(x)
+            x = BatchNormalization(name='norm_4')(x)
+            x = Activation('relu')(x)
+
+            # Layer 5
+            x = Conv2D(128, (3,3), strides=(1,1), padding='same', name='conv_5', use_bias=False)(x)
+            x = BatchNormalization(name='norm_5')(x)
+            x = Activation('relu')(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
+
+            # Layer 6
+            x = Conv2D(256, (3,3), strides=(1,1), padding='same', name='conv_6', use_bias=False)(x)
+            x = BatchNormalization(name='norm_6')(x)
+            x = Activation('relu')(x)
+
+            # Layer 7
+            x = Conv2D(128, (1,1), strides=(1,1), padding='same', name='conv_7', use_bias=False)(x)
+            x = BatchNormalization(name='norm_7')(x)
+            x = Activation('relu')(x)
+
+            # Layer 8
+            x = Conv2D(256, (3,3), strides=(1,1), padding='same', name='conv_8', use_bias=False)(x)
+            x = BatchNormalization(name='norm_8')(x)
+            x = Activation('relu')(x)
+            x = MaxPooling2D(pool_size=(2, 2))(x)
+
+            # Layer 9
+            x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_9', use_bias=False)(x)
+            x = BatchNormalization(name='norm_9')(x)
+            x = Activation('relu')(x)
+
+            # Layer 10
+            x = Conv2D(256, (1,1), strides=(1,1), padding='same', name='conv_10', use_bias=False)(x)
+            x = BatchNormalization(name='norm_10')(x)
+            x = Activation('relu')(x)
+
+            # Layer 11
+            x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_11', use_bias=False)(x)
+            x = BatchNormalization(name='norm_11')(x)
+            x = Activation('relu')(x)
+
+            # Layer 12
+            x = Conv2D(256, (1,1), strides=(1,1), padding='same', name='conv_12', use_bias=False)(x)
+            x = BatchNormalization(name='norm_12')(x)
+            x = Activation('relu')(x)
+
+            # Layer 13
+            x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_13', use_bias=False)(x)
+            x = BatchNormalization(name='norm_13')(x)
+            x = Activation('relu')(x)
+
+            skip_connection = x
+
+            x = MaxPooling2D(pool_size=(2, 2))(x)
+
+            # Layer 14
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_14', use_bias=False)(x)
+            x = BatchNormalization(name='norm_14')(x)
+            x = Activation('relu')(x)
+
+            # Layer 15
+            x = Conv2D(512, (1,1), strides=(1,1), padding='same', name='conv_15', use_bias=False)(x)
+            x = BatchNormalization(name='norm_15')(x)
+            x = Activation('relu')(x)
+
+            # Layer 16
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_16', use_bias=False)(x)
+            x = BatchNormalization(name='norm_16')(x)
+            x = Activation('relu')(x)
+
+            # Layer 17
+            x = Conv2D(512, (1,1), strides=(1,1), padding='same', name='conv_17', use_bias=False)(x)
+            x = BatchNormalization(name='norm_17')(x)
+            x = Activation('relu')(x)
+
+            # Layer 18
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_18', use_bias=False)(x)
+            x = BatchNormalization(name='norm_18')(x)
+            x = Activation('relu')(x)
+
+            # Layer 19
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_19', use_bias=False)(x)
+            x = BatchNormalization(name='norm_19')(x)
+            x = Activation('relu')(x)
+
+            # Layer 20
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_20', use_bias=False)(x)
+            x = BatchNormalization(name='norm_20')(x)
+            x = Activation('relu')(x)
+
+            # Layer 21
+            skip_connection = Conv2D(64, (1,1), strides=(1,1), padding='same', name='conv_21', use_bias=False)(skip_connection)
+            skip_connection = BatchNormalization(name='norm_21')(skip_connection)
+            skip_connection = Activation('relu')(skip_connection)
+            skip_connection = Lambda(space_to_depth_x2)(skip_connection)
+
+            x = concatenate([skip_connection, x])
+
+            # Layer 22
+            x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_22', use_bias=False)(x)
+            x = BatchNormalization(name='norm_22')(x)
+            x = Activation('relu')(x)
 
         self.feature_extractor = Model(input_image, x)  
         self.feature_extractor.load_weights(FULL_YOLO_BACKEND_PATH)
 
+        print("Feature extractor summary")
+        self.feature_extractor.summary()
     def normalize(self, image):
         return image / 255.
 
 class TinyYoloFeature(BaseFeatureExtractor):
     """docstring for ClassName"""
-    def __init__(self, input_size):
+    def __init__(self, input_size,useLeaky = True):
         input_image = Input(shape=(input_size, input_size, 3))
 
         # Layer 1
         x = Conv2D(16, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
         x = BatchNormalization(name='norm_1')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+        if useLeaky:
+            x = LeakyReLU(alpha=0.1)(x)
+        else:
+            x_t = Lambda(lambda x: x * 0.08)(x)
+            x = Activation('relu')(x)
+            x = Add()([x,x_t])
         x = MaxPooling2D(pool_size=(2, 2))(x)
 
         # Layer 2 - 5
         for i in range(0,4):
             x = Conv2D(32*(2**i), (3,3), strides=(1,1), padding='same', name='conv_' + str(i+2), use_bias=False)(x)
             x = BatchNormalization(name='norm_' + str(i+2))(x)
-            x = LeakyReLU(alpha=0.1)(x)
+            if useLeaky:
+                x = LeakyReLU(alpha=0.1)(x)
+            else:
+                x_t =Lambda(lambda x: x * 0.08)(x)
+                x = Activation('relu')(x)
+                x = Add()([x,x_t])
             x = MaxPooling2D(pool_size=(2, 2))(x)
 
         # Layer 6
         x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_6', use_bias=False)(x)
         x = BatchNormalization(name='norm_6')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+        if useLeaky:
+            x = LeakyReLU(alpha=0.1)(x)
+        else:
+            x_t =Lambda(lambda x: x * 0.08)(x)
+            x = Activation('relu')(x)
+            x = Add()([x,x_t])
         x = MaxPooling2D(pool_size=(2, 2), strides=(1,1), padding='same')(x)
 
         # Layer 7 - 8
         for i in range(0,2):
             x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_' + str(i+7), use_bias=False)(x)
             x = BatchNormalization(name='norm_' + str(i+7))(x)
-            x = LeakyReLU(alpha=0.1)(x)
+            if useLeaky:
+                x = LeakyReLU(alpha=0.1)(x)
+            else:
+                x_t =Lambda(lambda x:  x * 0.08)(x)
+                x = Activation('relu')(x)
+                x = Add()([x,x_t])
 
-        self.feature_extractor = Model(input_image, x)  
+        self.feature_extractor = Model(input_image, x)
         self.feature_extractor.load_weights(TINY_YOLO_BACKEND_PATH)
 
     def normalize(self, image):
@@ -210,8 +357,8 @@ class MobileNetFeature(BaseFeatureExtractor):
     def __init__(self, input_size):
         input_image = Input(shape=(input_size, input_size, 3))
 
-        mobilenet = MobileNet(input_shape=(224,224,3), include_top=False)
-        mobilenet.load_weights(MOBILENET_BACKEND_PATH)
+        mobilenet = MobileNet(input_shape=(input_size,input_size,3), include_top=False, weights = 'imagenet')
+        #mobilenet.load_weights(MOBILENET_BACKEND_PATH)
 
         x = mobilenet(input_image)
 
@@ -288,8 +435,8 @@ class Inception3Feature(BaseFeatureExtractor):
     def __init__(self, input_size):
         input_image = Input(shape=(input_size, input_size, 3))
 
-        inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False)
-        inception.load_weights(INCEPTION3_BACKEND_PATH)
+        inception = InceptionV3(input_shape=(input_size,input_size,3), include_top=False, weights='imagenet')
+#        inception.load_weights(INCEPTION3_BACKEND_PATH)
 
         x = inception(input_image)
 
@@ -338,3 +485,20 @@ class ResNet50Feature(BaseFeatureExtractor):
         image[..., 2] -= 123.68
 
         return image 
+
+class Densenet121Feature(BaseFeatureExtractor):
+    """docstring for ClassName"""
+    def __init__(self, input_size):
+        input_image = Input(shape=(input_size, input_size, 3))
+
+        dense = DenseNet121(input_shape=(input_size,input_size,3), include_top=False, weights='imagenet')
+        x = dense(input_image)
+
+        self.feature_extractor = Model(input_image, x)
+
+    def normalize(self, image):
+        image = image / 255.
+        image = image - 0.5
+        image = image * 2.
+
+        return image
