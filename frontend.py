@@ -283,7 +283,7 @@ class YOLO(object):
         return loss
 
 
-    def print_structure(weight_file_path):
+    def print_structure(self,weight_file_path):
         """
         Prints out the structure of HDF5 file.
         Args:
@@ -332,7 +332,7 @@ class YOLO(object):
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
        
         # Get the weights from the file in the same order set_weights wants them 
-        print_structure(weight_path)
+        self.print_structure(weight_path)
         f = h5py.File(weight_path, "r")
         
         weights = []
