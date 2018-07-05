@@ -283,6 +283,39 @@ class YOLO(object):
         return loss
 
 
+    def print_structure(weight_file_path):
+    """
+    Prints out the structure of HDF5 file.
+
+    Args:
+      weight_file_path (str) : Path to the file to analyze
+    """
+    f = h5py.File(weight_file_path)
+    try:
+        if len(f.attrs.items()):
+            print("{} contains: ".format(weight_file_path))
+            print("Root attributes:")
+        for key, value in f.attrs.items():
+            print("  {}: {}".format(key, value))
+
+        if len(f.items())==0:
+            return 
+
+        for layer, g in f.items():
+            print("  {}".format(layer))
+            print("    Attributes:")
+            for key, value in g.attrs.items():
+                print("      {}: {}".format(key, value))
+
+            print("    Dataset:")
+            for p_name in g.keys():
+                param = g[p_name]
+                subkeys = param.keys()
+                for k_name in param.keys():
+                    print("      {}/{}: {}".format(p_name, k_name, param.get(k_name)[:]))
+    finally:
+        f.close()
+    
     def load_weights(self, weight_path):
         # Get the names of the weights for the entire model
         layer = self.model
@@ -299,9 +332,9 @@ class YOLO(object):
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
        
-        # Get the weights from the file in the same order set_weights wants them
+        # Get the weights from the file in the same order set_weights wants them 
+        print_structure(weight_path)
         f = h5py.File(weight_path, "r")
-        print("Layers in weight file")
         
         weights = []
         for name in names:
