@@ -301,6 +301,8 @@ class YOLO(object):
        
         # Get the weights from the file in the same order set_weights wants them
         f = h5py.File(weight_path, "r")
+        print("Layers in weight file")
+        
         weights = []
         for name in names:
             weights.append(f["model_2/" + name].value)
