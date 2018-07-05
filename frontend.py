@@ -61,7 +61,8 @@ class YOLO(object):
         self.nb_box   = int(len(anchors)/2)
         self.class_wt = np.ones(self.nb_class, dtype='float32')
         self.anchors  = anchors
-
+        self.useleaky = useleaky
+        print("LEAKY STATUS " + str(useleaky))
         self.max_box_per_image = max_box_per_image
 
         ##########################
@@ -81,7 +82,7 @@ class YOLO(object):
         elif architecture == 'Full Yolo':
             self.feature_extractor = FullYoloFeature(self.input_size, useleaky)
         elif architecture == 'Tiny Yolo':
-            self.feature_extractor = TinyYoloFeature(self.input_size)
+            self.feature_extractor = TinyYoloFeature(self.input_size, useleaky)
         elif architecture == 'VGG16':
             self.feature_extractor = VGG16Feature(self.input_size)
         elif architecture == 'ResNet50':
@@ -293,8 +294,8 @@ class YOLO(object):
         names = [ el.name for el in symbolic_weights]
         print(names)
 
-        #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
-#        print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
+       # print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
+       # print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
        
@@ -318,8 +319,8 @@ class YOLO(object):
         # A bit of cleaning
         del weights
         f.close()
-        #print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
-        #print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
+       # print("Sum conv_22", np.sum(self.model.get_layer("model_2").get_layer("conv_22").get_weights()))
+       # print("Sum norm_1", np.sum(self.model.get_layer("model_1").get_layer("norm_1").get_weights()))
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[0]))
         print("Sum conv_23", np.sum(self.model.get_layer("conv_23").get_weights()[1]))
 
