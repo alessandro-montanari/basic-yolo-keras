@@ -1,6 +1,6 @@
 from keras.models import Model
 import tensorflow as tf
-from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, Flatten, Dense, Lambda
+from keras.layers import Reshape, Activation, Conv2D, Input, MaxPooling2D, BatchNormalization, Flatten, Dense, Lambda, Add, Lambda
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import concatenate
 from keras.applications.mobilenet import MobileNet
@@ -298,33 +298,53 @@ class FullYoloFeature(BaseFeatureExtractor):
 
 class TinyYoloFeature(BaseFeatureExtractor):
     """docstring for ClassName"""
-    def __init__(self, input_size):
+    def __init__(self, input_size,useLeaky = True):
         input_image = Input(shape=(input_size, input_size, 3))
 
         # Layer 1
         x = Conv2D(16, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
         x = BatchNormalization(name='norm_1')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+        if useLeaky:
+            x = LeakyReLU(alpha=0.1)(x)
+        else:
+            x_t = Lambda(lambda x: x * 0.08)(x)
+            x = Activation('relu')(x)
+            x = Add()([x,x_t])
         x = MaxPooling2D(pool_size=(2, 2))(x)
 
         # Layer 2 - 5
         for i in range(0,4):
             x = Conv2D(32*(2**i), (3,3), strides=(1,1), padding='same', name='conv_' + str(i+2), use_bias=False)(x)
             x = BatchNormalization(name='norm_' + str(i+2))(x)
-            x = LeakyReLU(alpha=0.1)(x)
+            if useLeaky:
+                x = LeakyReLU(alpha=0.1)(x)
+            else:
+                x_t =Lambda(lambda x: x * 0.08)(x)
+                x = Activation('relu')(x)
+                x = Add()([x,x_t])
             x = MaxPooling2D(pool_size=(2, 2))(x)
 
         # Layer 6
         x = Conv2D(512, (3,3), strides=(1,1), padding='same', name='conv_6', use_bias=False)(x)
         x = BatchNormalization(name='norm_6')(x)
-        x = LeakyReLU(alpha=0.1)(x)
+        if useLeaky:
+            x = LeakyReLU(alpha=0.1)(x)
+        else:
+            x_t =Lambda(lambda x: x * 0.08)(x)
+            x = Activation('relu')(x)
+            x = Add()([x,x_t])
         x = MaxPooling2D(pool_size=(2, 2), strides=(1,1), padding='same')(x)
 
         # Layer 7 - 8
         for i in range(0,2):
             x = Conv2D(1024, (3,3), strides=(1,1), padding='same', name='conv_' + str(i+7), use_bias=False)(x)
             x = BatchNormalization(name='norm_' + str(i+7))(x)
-            x = LeakyReLU(alpha=0.1)(x)
+            if useLeaky:
+                x = LeakyReLU(alpha=0.1)(x)
+            else:
+                x_t =Lambda(lambda x:  x * 0.08)(x)
+                x = Activation('relu')(x)
+                x = Add()([x,x_t])
 
         self.feature_extractor = Model(input_image, x)
         self.feature_extractor.load_weights(TINY_YOLO_BACKEND_PATH)
