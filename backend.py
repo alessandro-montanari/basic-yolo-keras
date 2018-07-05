@@ -300,7 +300,7 @@ class TinyYoloFeature(BaseFeatureExtractor):
     """docstring for ClassName"""
     def __init__(self, input_size,useLeaky = True):
         input_image = Input(shape=(input_size, input_size, 3))
-
+        print("Building TINY YOLO backend, useLeaky = "+ str(useLeaky))
         # Layer 1
         x = Conv2D(16, (3,3), strides=(1,1), padding='same', name='conv_1', use_bias=False)(input_image)
         x = BatchNormalization(name='norm_1')(x)
